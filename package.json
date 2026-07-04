@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "call-centric-crm",
   "version": "0.1.0",
   "private": true,
@@ -14,7 +13,9 @@
     "worker:dev": "nodemon --watch lib --watch scripts --ext ts --exec 'ts-node --project tsconfig.server.json scripts/startWorker.ts'"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.43.0",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.1",
     "@upstash/redis": "^1.31.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.7.0",
@@ -37,11 +38,5 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5"
-=======
-  "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.108.1"
->>>>>>> 016a39dba4e5b8cffe71c45e46fa03623abfbd0d
   }
 }

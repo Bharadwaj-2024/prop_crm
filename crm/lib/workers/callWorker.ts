@@ -106,7 +106,7 @@ export function startCallWorker() {
     CALL_QUEUE_NAME,
     processCallJob,
     {
-      connection: redisConnection as any,
+      connection: redisConnection,
       concurrency: 5, // process up to 5 calls in parallel
     }
   );

@@ -466,7 +466,7 @@ export default function DashboardPage() {
                   <div style={{ background: COLORS.black, borderBottom: "1px solid rgba(201,168,76,0.08)", padding: "12px 14px", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                     <div>
                       <div style={{ color: COLORS.offWhite, fontSize: 13, fontWeight: 600 }}>{event.lead_phone}</div>
-                      <div style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6, ...badgeStyle(isInbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", isInbound ? "rgba(16,185,129,0.2)" : "rgba(59,130,246,0.2)", isInbound ? "#10B981" : "#60A5FA") }}>
+                      <div style={{ marginTop: 4, ...badgeStyle(isInbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", isInbound ? "rgba(16,185,129,0.2)" : "rgba(59,130,246,0.2)", isInbound ? "#10B981" : "#60A5FA") }}>
                         {isInbound ? "Inbound" : "Outbound"}
                       </div>
                     </div>
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                               <div style={{ width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: inbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", color: inbound ? "#10B981" : "#60A5FA" }}>{inbound ? "📲" : "📤"}</div>
                               <div>
                                 <div style={{ color: COLORS.offWhite, fontSize: 13, fontWeight: 700 }}>{event.channel} · {event.direction}</div>
-                                <div style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6, ...badgeStyle(inbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", inbound ? "rgba(16,185,129,0.2)" : "rgba(59,130,246,0.2)", inbound ? "#10B981" : "#60A5FA") }}>
+                                <div style={{ marginTop: 4, ...badgeStyle(inbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", inbound ? "rgba(16,185,129,0.2)" : "rgba(59,130,246,0.2)", inbound ? "#10B981" : "#60A5FA") }}>
                                   {event.lead_phone}
                                 </div>
                               </div>

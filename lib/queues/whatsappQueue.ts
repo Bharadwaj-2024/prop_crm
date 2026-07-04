@@ -4,7 +4,7 @@ import { redisConnection } from "@/lib/queues/callQueue";
 export const WHATSAPP_QUEUE_NAME = "whatsapp-processing";
 
 export const whatsappQueue = new Queue<WhatsAppJobPayload>(WHATSAPP_QUEUE_NAME, {
-  connection: redisConnection as any,
+  connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
     backoff: {

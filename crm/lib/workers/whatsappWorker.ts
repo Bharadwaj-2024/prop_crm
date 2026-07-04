@@ -122,7 +122,7 @@ export function startWhatsAppWorker() {
     WHATSAPP_QUEUE_NAME,
     processWhatsAppJob,
     {
-      connection: redisConnection as any,
+      connection: redisConnection,
       concurrency: 5,
     }
   );
