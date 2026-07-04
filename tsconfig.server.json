@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "dist",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["scripts/**/*", "lib/**/*"],
+  "exclude": ["node_modules", ".next", "app"],
+  "ts-node": {
+    "require": ["tsconfig-paths/register"]
+  }
+}
