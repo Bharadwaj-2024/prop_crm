@@ -1,34 +1,23 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
-const COLORS = {
-  gold: "#C9A84C",
-  richGold: "#F0C040",
-  darkGold: "#A07830",
-  black: "#0A0A0A",
-  deepBlack: "#111111",
-  charcoal: "#1A1A1A",
-  offWhite: "#F5F0E8",
-  warmWhite: "#E8E0D0",
-  muted: "#6B6B6B",
-} as const;
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Phone, Loader2, AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [buttonHover, setButtonHover] = useState(false);
+  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+    e.preventDefault()
+    setLoading(true)
+    setError("")
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -36,219 +25,109 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
         credentials: "include",
-      });
+      })
 
-      const data = await res.json();
+      const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error ?? "Login failed");
-        return;
+        setError(data.error ?? "Login failed")
+        return
       }
 
-      sessionStorage.setItem("access_token", data.accessToken);
-      sessionStorage.setItem("broker", JSON.stringify(data.broker));
-      document.cookie = `session_token=${data.accessToken}; path=/; max-age=900; SameSite=Lax`;
+      sessionStorage.setItem("access_token", data.accessToken)
+      sessionStorage.setItem("broker", JSON.stringify(data.broker))
+      document.cookie = `session_token=${data.accessToken}; path=/; max-age=900; SameSite=Lax`
 
-      router.push("/dashboard");
+      router.push("/dashboard")
     } catch {
-      setError("Network error. Please try again.");
+      setError("Network error. Please try again.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  const inputStyle = (focused: boolean) => ({
-    width: "100%",
-    padding: "12px 16px",
-    borderRadius: "10px",
-    border: focused ? `1px solid ${COLORS.gold}` : "1px solid rgba(201,168,76,0.2)",
-    background: COLORS.charcoal,
-    color: COLORS.offWhite,
-    outline: "none",
-    fontSize: "14px",
-    lineHeight: 1.6,
-    boxShadow: focused ? "0 0 0 3px rgba(201,168,76,0.1)" : "none",
-    transition: "all 0.2s ease",
-    boxSizing: "border-box" as const,
-  });
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        fontFamily: "Inter, -apple-system, sans-serif",
-        background:
-          "radial-gradient(ellipse at center, rgba(201,168,76,0.08) 0%, #0A0A0A 70%)",
-        color: COLORS.offWhite,
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "420px",
-          background: COLORS.deepBlack,
-          border: "1px solid rgba(201,168,76,0.3)",
-          borderRadius: "20px",
-          padding: "48px",
-          boxShadow:
-            "0 24px 80px rgba(201,168,76,0.15), 0 0 0 1px rgba(201,168,76,0.1)",
-          backdropFilter: "blur(18px)",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div
-            style={{
-              width: "64px",
-              height: "64px",
-              margin: "0 auto 24px",
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, #C9A84C, #F0C040)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "28px",
-              boxShadow: "0 8px 24px rgba(201,168,76,0.28)",
-            }}
-          >
-            📞
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              color: COLORS.gold,
-              fontSize: "28px",
-              fontWeight: 800,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            CallCRM
-          </h1>
-          <p
-            style={{
-              margin: "8px 0 0",
-              fontSize: "13px",
-              lineHeight: 1.6,
-              color: COLORS.muted,
-            }}
-          >
-            Real Estate Intelligence Platform
-          </p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0A0A0A]">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-900/20 via-transparent to-transparent" />
 
-        <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: "18px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                color: COLORS.gold,
-                fontSize: "12px",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              required
-              onChange={(e) => setEmail(e.target.value)}
-              onFocus={() => setEmailFocused(true)}
-              onBlur={() => setEmailFocused(false)}
-              placeholder="you@agency.com"
-              style={inputStyle(emailFocused)}
-            />
+      <Card className="w-full max-w-md relative border-amber-900/30 bg-[#111111]/80 backdrop-blur-xl shadow-2xl shadow-black/50">
+        <CardHeader className="space-y-6 text-center pb-8">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-[#C9A84C] to-[#F0C040] flex items-center justify-center shadow-lg shadow-amber-500/25">
+            <Phone className="h-8 w-8 text-[#0A0A0A]" />
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                color: COLORS.gold,
-                fontSize: "12px",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              required
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={() => setPasswordFocused(true)}
-              onBlur={() => setPasswordFocused(false)}
-              placeholder="••••••••"
-              style={inputStyle(passwordFocused)}
-            />
+          <div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-[#C9A84C] to-[#F0C040] bg-clip-text text-transparent">
+              CallCRM
+            </CardTitle>
+            <CardDescription className="text-[#6B6B6B] mt-2">
+              Real Estate Intelligence Platform
+            </CardDescription>
           </div>
+        </CardHeader>
 
-          {error && (
-            <div
-              style={{
-                marginBottom: "16px",
-                padding: "12px 14px",
-                borderRadius: "8px",
-                background: "rgba(220,38,38,0.1)",
-                border: "1px solid rgba(220,38,38,0.3)",
-                color: "#FCA5A5",
-                fontSize: "13px",
-                lineHeight: 1.6,
-              }}
-            >
-              {error}
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-[#C9A84C]/90 uppercase tracking-wider">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                required
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@agency.com"
+                className="bg-[#1A1A1A] border-[#C9A84C]/20 focus:border-[#C9A84C]/50 focus:ring-[#C9A84C]/20 text-[#F5F0E8] placeholder:text-[#6B6B6B]"
+                disabled={loading}
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            onMouseEnter={() => setButtonHover(true)}
-            onMouseLeave={() => setButtonHover(false)}
-            style={{
-              width: "100%",
-              border: "none",
-              borderRadius: "10px",
-              padding: "14px",
-              fontSize: "15px",
-              fontWeight: 800,
-              color: COLORS.black,
-              cursor: loading ? "not-allowed" : "pointer",
-              background:
-                "linear-gradient(135deg, #C9A84C 0%, #F0C040 50%, #C9A84C 100%)",
-              boxShadow: buttonHover
-                ? "0 8px 32px rgba(201,168,76,0.6), 0 0 0 1px rgba(201,168,76,0.2)"
-                : "0 4px 20px rgba(201,168,76,0.4)",
-              opacity: loading ? 0.7 : 1,
-              transform: buttonHover && !loading ? "translateY(-1px)" : "translateY(0)",
-              transition: "all 0.2s ease",
-            }}
-          >
-            {loading ? "Authenticating..." : "Sign in"}
-          </button>
-        </form>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium text-[#C9A84C]/90 uppercase tracking-wider">
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                required
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="bg-[#1A1A1A] border-[#C9A84C]/20 focus:border-[#C9A84C]/50 focus:ring-[#C9A84C]/20 text-[#F5F0E8] placeholder:text-[#6B6B6B]"
+                disabled={loading}
+              />
+            </div>
 
-        <p
-          style={{
-            margin: "20px 0 0",
-            textAlign: "center",
-            fontSize: "11px",
-            color: "#3A3A3A",
-            letterSpacing: "0.04em",
-          }}
-        >
-          Secured with JWT Authentication
-        </p>
-      </div>
+            {error && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-950/30 border border-red-900/50 text-red-400 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 bg-gradient-to-r from-[#C9A84C] to-[#F0C040] hover:from-[#F0C040] hover:to-[#C9A84C] text-[#0A0A0A] font-semibold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-200"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Authenticating...
+                </>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-xs text-[#3A3A3A] tracking-wide">
+            Secured with JWT Authentication
+          </p>
+        </CardContent>
+      </Card>
     </div>
-  );
+  )
 }

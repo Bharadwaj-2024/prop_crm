@@ -1,631 +1,731 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/lib/hooks/use-toast"
+import {
+  Phone,
+  MessageSquare,
+  Users,
+  TrendingUp,
+  Briefcase,
+  PhoneCall,
+  RefreshCw,
+  LogOut,
+  Search,
+  Copy,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  Home,
+  ChevronDown,
+  Loader2,
+  AlertCircle,
+  IndianRupee,
+  Calendar,
+  Target,
+} from "lucide-react"
 
 type Lead = {
-  id: string;
-  phone: string;
-  name: string | null;
-  budget_min: number | null;
-  budget_max: number | null;
-  location: string | null;
-  bhk: string | null;
-  intent: string | null;
-  timeline: string | null;
-  summary: string | null;
-  stage: string;
-  last_contact_at: string | null;
-  last_whatsapp_at: string | null;
-  preferred_channel: string | null;
-  created_at: string;
-};
+  id: string
+  phone: string
+  name: string | null
+  budget_min: number | null
+  budget_max: number | null
+  location: string | null
+  bhk: string | null
+  intent: string | null
+  timeline: string | null
+  summary: string | null
+  stage: string
+  last_contact_at: string | null
+  last_whatsapp_at: string | null
+  preferred_channel: string | null
+  created_at: string
+}
 
 type TimelineEvent = {
-  id: string;
-  lead_phone: string;
-  channel: string;
-  direction: string;
-  duration_sec: number | null;
-  transcript: string | null;
-  extracted_fields: Record<string, unknown> | null;
-  intent_tag: string | null;
-  created_at: string;
-};
-
-const COLORS = {
-  gold: "#C9A84C",
-  richGold: "#F0C040",
-  darkGold: "#A07830",
-  black: "#0A0A0A",
-  deepBlack: "#111111",
-  charcoal: "#1A1A1A",
-  offWhite: "#F5F0E8",
-  warmWhite: "#E8E0D0",
-  muted: "#6B6B6B",
-} as const;
+  id: string
+  lead_phone: string
+  channel: string
+  direction: string
+  duration_sec: number | null
+  transcript: string | null
+  extracted_fields: Record<string, unknown> | null
+  intent_tag: string | null
+  created_at: string
+}
 
 function formatBudget(min: number | null, max: number | null): string {
-  if (!min && !max) return "—";
-  if (min && max) return `₹${min}–${max}L`;
-  if (min) return `₹${min}L+`;
-  return `Up to ₹${max}L`;
+  if (!min && !max) return "—"
+  if (min && max) return `₹${min}–${max}L`
+  if (min) return `₹${min}L+`
+  return `Up to ₹${max}L`
 }
 
 function formatDuration(sec: number | null): string {
-  if (!sec) return "0:00";
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  if (!sec) return "0:00"
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`
 }
 
 function relativeTime(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return days === 1 ? "yesterday" : `${days}d ago`;
+  if (!dateStr) return "—"
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return days === 1 ? "yesterday" : `${days}d ago`
 }
 
 function safeText(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return null;
+  if (value == null) return null
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return null
+}
+
+function Avatar({ name, phone }: { name: string | null; phone: string }) {
+  const letter = (name ?? phone)[0].toUpperCase()
+  return (
+    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#C9A84C] to-[#A07830] flex items-center justify-center text-[#0A0A0A] text-sm font-bold flex-shrink-0 shadow-md">
+      {letter}
+    </div>
+  )
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [channelFilter, setChannelFilter] = useState<"all" | "call" | "whatsapp">("all");
-  const [intentFilter, setIntentFilter] = useState<"all" | "serious_buyer" | "investor" | "just_browsing">("all");
-  const [stageFilter, setStageFilter] = useState<"all" | "new" | "contacted" | "site_visit" | "negotiation" | "closed">("all");
-  const [query, setQuery] = useState("");
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [now, setNow] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+  const router = useRouter()
+  const { toast } = useToast()
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [events, setEvents] = useState<TimelineEvent[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [channelFilter, setChannelFilter] = useState<"all" | "call" | "whatsapp">("all")
+  const [intentFilter, setIntentFilter] = useState<"all" | "serious_buyer" | "investor" | "just_browsing">("all")
+  const [stageFilter, setStageFilter] = useState<"all" | "new" | "contacted" | "site_visit" | "negotiation" | "closed">("all")
+  const [query, setQuery] = useState("")
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState("")
+  const [replySending, setReplySending] = useState(false)
+  const [replySent, setReplySent] = useState(false)
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-
+    setLoading(true)
     try {
-      const res = await fetch("/api/dashboard/data", { cache: "no-store" });
-      const data = await res.json();
-
+      const res = await fetch("/api/dashboard/data", {
+        cache: "no-store",
+        credentials: "include",
+      })
+      const data = await res.json()
       if (!res.ok) {
-        setError(JSON.stringify(data.error ?? data, null, 2));
-        setLoading(false);
-        return;
+        setError(typeof data.error === "string" ? data.error : JSON.stringify(data.error ?? data, null, 2))
+        setLoading(false)
+        return
       }
-
-      setLeads((data.leads ?? []) as Lead[]);
-      setEvents((data.events ?? []) as TimelineEvent[]);
-      setError(null);
-    } catch (fetchError) {
-      setError(JSON.stringify(fetchError, null, 2));
+      setLeads((data.leads ?? []) as Lead[])
+      setEvents((data.events ?? []) as TimelineEvent[])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error — is the dev server running?")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchData();
-    setNow(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
-    const clockTimer = setInterval(() => {
-      setNow(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
-    }, 60000);
-    const refreshTimer = setInterval(() => {
-      fetchData();
-    }, 30000);
+    fetchData()
+    const t = setInterval(fetchData, 30000)
+    return () => clearInterval(t)
+  }, [fetchData])
 
-    return () => {
-      clearInterval(clockTimer);
-      clearInterval(refreshTimer);
-    };
-  }, [fetchData]);
-
-  const todayStr = new Date().toDateString();
-  const callsToday = events.filter((e) => e.channel === "call" && new Date(e.created_at).toDateString() === todayStr).length;
-  const serious = leads.filter((l) => l.intent === "serious_buyer").length;
-  const investors = leads.filter((l) => l.intent === "investor").length;
+  const todayStr = new Date().toDateString()
+  const callsToday = events.filter((e) => e.channel === "call" && new Date(e.created_at).toDateString() === todayStr).length
+  const waToday = events.filter((e) => e.channel === "whatsapp" && new Date(e.created_at).toDateString() === todayStr).length
+  const serious = leads.filter((l) => l.intent === "serious_buyer").length
+  const investors = leads.filter((l) => l.intent === "investor").length
 
   const filteredLeads = useMemo(() => {
-    const leadPhonesForChannel =
-      channelFilter === "all"
-        ? null
-        : new Set(events.filter((event) => event.channel === channelFilter).map((event) => event.lead_phone));
-
+    const phones = channelFilter === "all" ? null : new Set(events.filter((e) => e.channel === channelFilter).map((e) => e.lead_phone))
     return leads.filter((lead) => {
-      const matchesSearch =
-        !query ||
-        [lead.name, lead.phone, lead.location, lead.bhk, lead.summary]
-          .filter(Boolean)
-          .some((field) => String(field).toLowerCase().includes(query.toLowerCase()));
-
-      const matchesChannel =
-        !leadPhonesForChannel || leadPhonesForChannel.has(lead.phone);
-
-      const matchesIntent = intentFilter === "all" || lead.intent === intentFilter;
-      const matchesStage = stageFilter === "all" || lead.stage === stageFilter;
-
-      return matchesSearch && matchesChannel && matchesIntent && matchesStage;
-    });
-  }, [channelFilter, events, intentFilter, leads, query, stageFilter]);
+      const matchSearch = !query || [lead.name, lead.phone, lead.location, lead.bhk, lead.summary].filter(Boolean).some((f) => String(f).toLowerCase().includes(query.toLowerCase()))
+      const matchChannel = !phones || phones.has(lead.phone)
+      const matchIntent = intentFilter === "all" || lead.intent === intentFilter
+      const matchStage = stageFilter === "all" || lead.stage === stageFilter
+      return matchSearch && matchChannel && matchIntent && matchStage
+    })
+  }, [channelFilter, events, intentFilter, leads, query, stageFilter])
 
   const selectedEvents = useMemo(
-    () =>
-      events
-        .filter((event) => event.lead_phone === selectedLead?.phone)
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    () => events.filter((e) => e.lead_phone === selectedLead?.phone).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [events, selectedLead]
-  );
-
-  const statCards = [
-    {
-      label: "Total Leads",
-      value: leads.length,
-      sub: `${events.length} total events`,
-      icon: "👥",
-      tint: "rgba(201,168,76,0.15)",
-      iconColor: COLORS.gold,
-    },
-    {
-      label: "Serious Buyers",
-      value: serious,
-      sub: leads.length ? `${Math.round((serious / leads.length) * 100)}% of leads` : "—",
-      icon: "🔥",
-      tint: "rgba(16,185,129,0.1)",
-      iconColor: "#10B981",
-    },
-    {
-      label: "Investors",
-      value: investors,
-      sub: leads.length ? `${Math.round((investors / leads.length) * 100)}% of leads` : "—",
-      icon: "💼",
-      tint: "rgba(245,158,11,0.1)",
-      iconColor: "#F59E0B",
-    },
-    {
-      label: "Calls Today",
-      value: callsToday,
-      sub: `${events.length} all-time`,
-      icon: "📞",
-      tint: "rgba(239,68,68,0.1)",
-      iconColor: "#EF4444",
-    },
-  ];
-
-  const badgeStyle = (bg: string, border: string, color: string) => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "3px 10px",
-    borderRadius: "999px",
-    background: bg,
-    border: `1px solid ${border}`,
-    color,
-    fontSize: "11px",
-    fontWeight: 600,
-    whiteSpace: "nowrap" as const,
-  });
-
-  const leadCount = filteredLeads.length;
+  )
 
   async function copyPhone(phone: string) {
     try {
-      await navigator.clipboard.writeText(phone);
-      setCopiedPhone(phone);
-      window.setTimeout(() => setCopiedPhone(null), 1200);
+      await navigator.clipboard.writeText(phone)
+      setCopiedPhone(phone)
+      setTimeout(() => setCopiedPhone(null), 1200)
+      toast({ title: "Copied!", description: phone })
     } catch {
-      setCopiedPhone(null);
+      setCopiedPhone(null)
+      toast({ title: "Failed to copy", description: "Please copy manually", variant: "destructive" })
+    }
+  }
+
+  async function sendReply() {
+    if (!selectedLead || !replyText.trim()) return
+    setReplySending(true)
+    try {
+      const res = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: selectedLead.phone, message: replyText }),
+      })
+      if (res.ok) {
+        setReplySent(true)
+        setReplyText("")
+        setTimeout(() => setReplySent(false), 2000)
+        toast({ title: "Message sent!", description: `WhatsApp reply sent to ${selectedLead.phone}` })
+      } else {
+        toast({ title: "Failed to send", description: "WhatsApp reply could not be delivered", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Network error", description: "Could not reach WhatsApp API", variant: "destructive" })
+    } finally {
+      setReplySending(false)
     }
   }
 
   async function handleSignOut() {
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
     } finally {
-      sessionStorage.removeItem("access_token");
-      sessionStorage.removeItem("broker");
-      document.cookie = "session_token=; path=/; max-age=0; SameSite=Lax";
-      document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax";
-      router.push("/");
-      router.refresh();
+      sessionStorage.removeItem("access_token")
+      sessionStorage.removeItem("broker")
+      document.cookie = "session_token=; path=/; max-age=0; SameSite=Lax"
+      document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax"
+      router.push("/")
+      router.refresh()
     }
   }
 
+  const statCards = [
+    { label: "Total Leads", value: leads.length, sub: `${events.length} total events`, icon: Users, color: "text-[#C9A84C]", bg: "bg-[#C9A84C]/10" },
+    { label: "Serious Buyers", value: serious, sub: leads.length ? `${Math.round((serious / leads.length) * 100)}% of leads` : "—", icon: TrendingUp, color: "text-emerald-400", bg: "bg-emerald-400/10" },
+    { label: "Investors", value: investors, sub: leads.length ? `${Math.round((investors / leads.length) * 100)}% of leads` : "—", icon: Briefcase, color: "text-amber-400", bg: "bg-amber-400/10" },
+    { label: "Activity Today", value: callsToday + waToday, sub: `${callsToday} calls · ${waToday} WhatsApp`, icon: PhoneCall, color: "text-blue-400", bg: "bg-blue-400/10" },
+  ]
+
   if (error) {
+    const isMissingEnv = error.toLowerCase().includes("supabase") || error.toLowerCase().includes("env")
     return (
-      <div style={{ minHeight: "100vh", background: COLORS.black, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Inter, -apple-system, sans-serif", color: COLORS.offWhite }}>
-        <div style={{ maxWidth: 560, width: "100%", background: COLORS.deepBlack, border: "1px solid rgba(201,168,76,0.2)", borderRadius: 20, padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}>
-          <div style={{ fontSize: 28, color: COLORS.gold, marginBottom: 12 }}>⚠️</div>
-          <h2 style={{ margin: "0 0 10px", color: COLORS.gold, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>Connection Error</h2>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: COLORS.warmWhite, fontSize: 12, lineHeight: 1.7, background: COLORS.charcoal, border: "1px solid rgba(201,168,76,0.14)", borderRadius: 12, padding: 16 }}>{error}</pre>
-          <button onClick={fetchData} style={{ marginTop: 16, border: "1px solid rgba(201,168,76,0.3)", background: "rgba(201,168,76,0.1)", color: COLORS.gold, borderRadius: 10, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }}>Retry</button>
-        </div>
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6">
+        <Card className="max-w-xl w-full border-[#C9A84C]/20 bg-[#111111] shadow-2xl shadow-black/60">
+          <CardHeader className="border-b border-[#C9A84C]/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <CardTitle className="text-red-400">{isMissingEnv ? "Setup Required" : "Connection Error"}</CardTitle>
+                <p className="text-xs text-[#6B6B6B] mt-0.5">{isMissingEnv ? "Configure your environment variables to continue" : "Failed to load dashboard data"}</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-4">
+            <div className="p-3 rounded-lg bg-red-950/20 border border-red-900/30 text-sm text-red-300 font-mono">
+              {error}
+            </div>
+            {isMissingEnv && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-[#C9A84C] uppercase tracking-wider">Steps to fix:</p>
+                <ol className="space-y-2 text-sm text-[#E8E0D0]/80">
+                  <li className="flex gap-2"><span className="text-[#C9A84C] font-bold">1.</span> Create a file named <code className="bg-[#1A1A1A] px-1.5 py-0.5 rounded text-[#C9A84C] text-xs">.env.local</code> in <code className="bg-[#1A1A1A] px-1.5 py-0.5 rounded text-[#C9A84C] text-xs">crm/</code></li>
+                  <li className="flex gap-2"><span className="text-[#C9A84C] font-bold">2.</span> Add your Supabase credentials from the Supabase dashboard</li>
+                  <li className="flex gap-2"><span className="text-[#C9A84C] font-bold">3.</span> Restart the dev server with <code className="bg-[#1A1A1A] px-1.5 py-0.5 rounded text-[#C9A84C] text-xs">npm run dev</code></li>
+                </ol>
+                <div className="rounded-lg bg-[#0A0A0A] border border-[#C9A84C]/15 p-4 font-mono text-xs text-[#C9A84C]/80 space-y-1">
+                  <p className="text-[#6B6B6B]"># .env.local</p>
+                  <p>NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co</p>
+                  <p>NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key</p>
+                  <p>SUPABASE_SERVICE_ROLE_KEY=your_service_role_key</p>
+                </div>
+              </div>
+            )}
+            <Button onClick={fetchData} variant="outline" className="w-full border-[#C9A84C]/30 text-[#C9A84C] hover:bg-[#C9A84C]/10 bg-[#C9A84C]/5">
+              <RefreshCw className="mr-2 h-4 w-4" /> Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
-    );
+    )
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.black, color: COLORS.offWhite, fontFamily: "Inter, -apple-system, sans-serif" }}>
-      <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: 64, background: COLORS.deepBlack, borderRight: "1px solid rgba(201,168,76,0.1)", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 16, zIndex: 20 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #C9A84C, #A07830)", color: COLORS.black, fontSize: 18, boxShadow: "0 8px 24px rgba(201,168,76,0.2)" }}>📞</div>
-        {[
-          { icon: "▣", active: true },
-          { icon: "◫", active: false },
-          { icon: "⟡", active: false },
-          { icon: "⚙", active: false },
-        ].map((item, index) => (
-          <div key={index} style={{ width: 40, height: 40, borderRadius: 10, marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", color: item.active ? COLORS.gold : "#3A3A3A", background: item.active ? "rgba(201,168,76,0.1)" : "transparent", border: item.active ? "1px solid rgba(201,168,76,0.2)" : "1px solid transparent", fontSize: 20 }}>
-            {item.icon}
-          </div>
-        ))}
-      </div>
+    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F0E8]">
 
-      <main style={{ marginLeft: 64, padding: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, marginBottom: 24 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: COLORS.offWhite }}>Call Intelligence</h1>
-            <p style={{ margin: "8px 0 0", fontSize: 12, color: COLORS.muted }}>Live since {now || "—"} minutes ago</p>
+      {/* Header */}
+      <header className="sticky top-0 z-30 border-b border-[#C9A84C]/10 bg-[#0A0A0A]/90 backdrop-blur-xl">
+        <div className="max-w-screen-xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C9A84C] to-[#F0C040] flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
+              <Phone className="h-5 w-5 text-[#0A0A0A]" />
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-[#F5F0E8] leading-none">Call Intelligence</h1>
+              <p className="text-xs text-[#6B6B6B] mt-0.5">Real Estate CRM</p>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={fetchData} style={{ border: "1px solid rgba(201,168,76,0.3)", background: "rgba(201,168,76,0.1)", color: COLORS.gold, borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              onClick={handleSignOut}
-              style={{
-                border: "1px solid rgba(201,168,76,0.2)",
-                background: COLORS.deepBlack,
-                color: COLORS.warmWhite,
-                borderRadius: 8,
-                padding: "8px 16px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={fetchData}
+              disabled={loading}
+              size="sm"
+              variant="outline"
+              className="border-[#C9A84C]/20 bg-[#C9A84C]/5 text-[#C9A84C] hover:bg-[#C9A84C]/15 hover:border-[#C9A84C]/40"
             >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
+            <Button
+              onClick={handleSignOut}
+              size="sm"
+              variant="ghost"
+              className="text-[#6B6B6B] hover:text-[#F5F0E8] hover:bg-[#1A1A1A]"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
               Sign out
-            </button>
+            </Button>
           </div>
         </div>
+      </header>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 16 }}>
-          {statCards.map((card) => (
-            <div key={card.label} style={{ background: COLORS.deepBlack, border: "1px solid rgba(201,168,76,0.15)", borderRadius: 16, padding: 20, boxShadow: "0 4px 20px rgba(0,0,0,0.4)", transition: "all 0.2s ease" }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: card.tint, color: card.iconColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, marginBottom: 16 }}>{card.icon}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>{card.label}</div>
-              <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800, color: COLORS.offWhite, letterSpacing: "-0.02em" }}>{card.value}</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: COLORS.warmWhite }}>{card.sub}</div>
-            </div>
-          ))}
+      <main className="max-w-screen-xl mx-auto px-6 py-8 space-y-6">
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {statCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <Card key={card.label} className="border-[#C9A84C]/10 bg-[#111111] hover:border-[#C9A84C]/25 transition-colors">
+                <CardContent className="p-5">
+                  <div className={`w-11 h-11 rounded-xl ${card.bg} ${card.color} flex items-center justify-center mb-4`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <p className="text-[10px] font-semibold text-[#6B6B6B] uppercase tracking-widest">{card.label}</p>
+                  <p className="text-3xl font-extrabold text-[#F5F0E8] mt-1 mb-1">{card.value}</p>
+                  <p className="text-xs text-[#E8E0D0]/50">{card.sub}</p>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
-        <div style={{ background: COLORS.deepBlack, border: "1px solid rgba(201,168,76,0.1)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-          <form style={{ display: "grid", gridTemplateColumns: "1.4fr 0.8fr 0.8fr 0.8fr auto", gap: 12, alignItems: "center" }} onSubmit={(e) => e.preventDefault()}>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search leads, phone, location, summary" style={{ width: "100%", background: COLORS.charcoal, border: "1px solid rgba(201,168,76,0.2)", borderRadius: 8, padding: "10px 14px", color: COLORS.offWhite, fontSize: 13, outline: "none" }} />
-            <select value={channelFilter} onChange={(e) => setChannelFilter(e.target.value as "all" | "call" | "whatsapp")} style={{ width: "100%", background: COLORS.charcoal, border: "1px solid rgba(201,168,76,0.2)", borderRadius: 8, padding: "10px 14px", color: COLORS.offWhite, fontSize: 13, outline: "none" }}>
-              <option value="all">All channels</option>
-              <option value="call">Calls</option>
-              <option value="whatsapp">WhatsApp</option>
-            </select>
-            <select value={intentFilter} onChange={(e) => setIntentFilter(e.target.value as typeof intentFilter)} style={{ width: "100%", background: COLORS.charcoal, border: "1px solid rgba(201,168,76,0.2)", borderRadius: 8, padding: "10px 14px", color: COLORS.offWhite, fontSize: 13, outline: "none" }}>
-              <option value="all">All intents</option>
-              <option value="serious_buyer">Serious buyers</option>
-              <option value="investor">Investors</option>
-              <option value="just_browsing">Browsing</option>
-            </select>
-            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as typeof stageFilter)} style={{ width: "100%", background: COLORS.charcoal, border: "1px solid rgba(201,168,76,0.2)", borderRadius: 8, padding: "10px 14px", color: COLORS.offWhite, fontSize: 13, outline: "none" }}>
-              <option value="all">All stages</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="site_visit">Site Visit</option>
-              <option value="negotiation">Negotiation</option>
-              <option value="closed">Closed</option>
-            </select>
-            <div style={{ fontSize: 12, color: COLORS.muted, whiteSpace: "nowrap" }}>{leadCount} results</div>
-          </form>
-        </div>
+        {/* Filters */}
+        <Card className="border-[#C9A84C]/10 bg-[#111111]">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="relative lg:col-span-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B6B6B]" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search leads, phone, location…"
+                  className="pl-9 bg-[#1A1A1A] border-[#C9A84C]/15 focus:border-[#C9A84C]/40 text-[#F5F0E8] placeholder:text-[#6B6B6B]"
+                />
+              </div>
+              <Select value={channelFilter} onValueChange={(v) => setChannelFilter(v as typeof channelFilter)}>
+                <SelectTrigger className="bg-[#1A1A1A] border-[#C9A84C]/15 text-[#F5F0E8] focus:ring-[#C9A84C]/20 focus:border-[#C9A84C]/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1A1A1A] border-[#C9A84C]/20 text-[#F5F0E8]">
+                  <SelectItem value="all">All channels</SelectItem>
+                  <SelectItem value="call">📞 Calls</SelectItem>
+                  <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
 
-        <div style={{ background: COLORS.deepBlack, border: "1px solid rgba(201,168,76,0.1)", borderRadius: 16, overflow: "hidden", marginBottom: 16 }}>
-          <div style={{ padding: "12px 20px", background: COLORS.black, borderBottom: "1px solid rgba(201,168,76,0.1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ color: COLORS.offWhite, fontWeight: 700 }}>Leads</div>
-            <div style={{ color: COLORS.muted, fontSize: 12 }}>{leadCount} visible</div>
-          </div>
+              <Select value={intentFilter} onValueChange={(v) => setIntentFilter(v as typeof intentFilter)}>
+                <SelectTrigger className="bg-[#1A1A1A] border-[#C9A84C]/15 text-[#F5F0E8] focus:ring-[#C9A84C]/20 focus:border-[#C9A84C]/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1A1A1A] border-[#C9A84C]/20 text-[#F5F0E8]">
+                  <SelectItem value="all">All intents</SelectItem>
+                  <SelectItem value="serious_buyer">🔥 Serious buyers</SelectItem>
+                  <SelectItem value="investor">💼 Investors</SelectItem>
+                  <SelectItem value="just_browsing">Browsing</SelectItem>
+                </SelectContent>
+              </Select>
 
-          {loading ? (
-            <div style={{ padding: 24 }}>
-              <div style={{ height: 16, borderRadius: 8, background: "linear-gradient(90deg, #1A1A1A 25%, #222222 50%, #1A1A1A 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }} />
+              <Select value={stageFilter} onValueChange={(v) => setStageFilter(v as typeof stageFilter)}>
+                <SelectTrigger className="bg-[#1A1A1A] border-[#C9A84C]/15 text-[#F5F0E8] focus:ring-[#C9A84C]/20 focus:border-[#C9A84C]/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1A1A1A] border-[#C9A84C]/20 text-[#F5F0E8]">
+                  <SelectItem value="all">All stages</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="site_visit">Site Visit</SelectItem>
+                  <SelectItem value="negotiation">Negotiation</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : leadCount === 0 ? (
-            <div style={{ padding: 48, textAlign: "center" }}>
-              <div style={{ fontSize: 48, color: COLORS.gold, opacity: 0.4, marginBottom: 12 }}>🏛️</div>
-              <div style={{ color: COLORS.offWhite, fontSize: 18, fontWeight: 700, marginBottom: 6 }}>No leads yet</div>
-              <div style={{ color: COLORS.muted, fontSize: 13, lineHeight: 1.6 }}>{query || channelFilter !== "all" || intentFilter !== "all" || stageFilter !== "all" ? "Clear filters to see all results" : "Make a call to generate your first lead"}</div>
+          </CardContent>
+        </Card>
+
+        {/* Leads Table */}
+        <Card className="border-[#C9A84C]/10 bg-[#111111]">
+          <CardHeader className="border-b border-[#C9A84C]/10 pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-[#F5F0E8] text-base font-semibold">Leads</CardTitle>
+              <Badge className="bg-[#C9A84C]/10 text-[#C9A84C] border-[#C9A84C]/20 hover:bg-[#C9A84C]/15">
+                {filteredLeads.length} results
+              </Badge>
             </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: COLORS.black, borderBottom: "1px solid rgba(201,168,76,0.1)" }}>
-                    {['Lead', 'Channel', 'Budget', 'Location', 'BHK', 'Intent', 'Timeline', 'Stage', 'Last Contact', 'Actions'].map((header) => (
-                      <th key={header} style={{ padding: "12px 20px", textAlign: "left", fontSize: 10, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>{header}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLeads.map((lead, index) => {
-                    const hasCall = events.some((event) => event.lead_phone === lead.phone && event.channel === "call");
-                    const hasWA = events.some((event) => event.lead_phone === lead.phone && event.channel === "whatsapp");
-                    const intentColor =
-                      lead.intent === "serious_buyer"
-                        ? { bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.2)", color: "#10B981" }
-                        : lead.intent === "investor"
-                          ? { bg: "rgba(201,168,76,0.1)", border: "rgba(201,168,76,0.3)", color: COLORS.gold }
-                          : { bg: "rgba(107,107,107,0.1)", border: "rgba(107,107,107,0.2)", color: "#9CA3AF" };
-
-                    const stageColor =
-                      lead.stage === "new"
-                        ? { bg: "rgba(201,168,76,0.1)", border: "rgba(201,168,76,0.25)", color: COLORS.gold }
-                        : lead.stage === "contacted"
-                          ? { bg: "rgba(59,130,246,0.1)", border: "rgba(59,130,246,0.2)", color: "#60A5FA" }
-                          : lead.stage === "site_visit"
-                            ? { bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.2)", color: "#F59E0B" }
-                            : lead.stage === "negotiation"
-                              ? { bg: "rgba(168,85,247,0.1)", border: "rgba(168,85,247,0.2)", color: "#C084FC" }
-                              : { bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.2)", color: "#10B981" };
-
-                    return (
-                      <tr
-                        key={lead.id}
-                        style={{ background: index % 2 === 0 ? COLORS.deepBlack : "#131313", borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "all 0.15s ease" }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "rgba(201,168,76,0.05)";
-                          e.currentTarget.style.borderLeft = `2px solid ${COLORS.gold}`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = index % 2 === 0 ? COLORS.deepBlack : "#131313";
-                          e.currentTarget.style.borderLeft = "none";
-                        }}
-                      >
-                        <td style={{ padding: "16px 20px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, #C9A84C, #A07830)", color: COLORS.black, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, boxShadow: "0 4px 12px rgba(201,168,76,0.14)" }}>
-                              {(lead.name ?? lead.phone)[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ color: COLORS.offWhite, fontSize: 13, fontWeight: 700, lineHeight: 1.4 }}>{lead.name ?? "Unknown"}</div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                                <div style={{ color: COLORS.muted, fontSize: 11 }}>{lead.phone}</div>
-                                <button
-                                  type="button"
-                                  onClick={() => copyPhone(lead.phone)}
-                                  style={{ background: "transparent", border: "none", color: copiedPhone === lead.phone ? COLORS.richGold : COLORS.muted, fontSize: 12, cursor: "pointer", padding: 0 }}
-                                >
-                                  {copiedPhone === lead.phone ? "Copied" : "Copy phone"}
-                                </button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-14 rounded-lg bg-[#1A1A1A] animate-pulse" />
+                ))}
+              </div>
+            ) : filteredLeads.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="text-5xl mb-4 opacity-30">🏛️</div>
+                <p className="text-[#F5F0E8] font-semibold text-lg mb-1">No leads found</p>
+                <p className="text-[#6B6B6B] text-sm">
+                  {query || channelFilter !== "all" || intentFilter !== "all" || stageFilter !== "all"
+                    ? "Try adjusting your filters"
+                    : "Make a call to generate your first lead"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-[#C9A84C]/10 hover:bg-transparent">
+                      {["Lead", "Channel", "Budget", "Location", "BHK", "Intent", "Stage", "Last Contact"].map((h) => (
+                        <TableHead key={h} className="text-[10px] font-bold text-[#6B6B6B] uppercase tracking-widest whitespace-nowrap">
+                          {h}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLeads.map((lead) => {
+                      const hasCall = events.some((e) => e.lead_phone === lead.phone && e.channel === "call")
+                      const hasWA = events.some((e) => e.lead_phone === lead.phone && e.channel === "whatsapp")
+                      return (
+                        <TableRow
+                          key={lead.id}
+                          onClick={() => setSelectedLead(lead)}
+                          className="cursor-pointer border-[#C9A84C]/5 hover:bg-[#C9A84C]/5 transition-colors group"
+                        >
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar name={lead.name} phone={lead.phone} />
+                              <div>
+                                <p className="font-semibold text-[#F5F0E8] text-sm group-hover:text-[#C9A84C] transition-colors">
+                                  {lead.name ?? "Unknown"}
+                                </p>
+                                <p className="text-xs text-[#6B6B6B]">{lead.phone}</p>
                               </div>
                             </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "16px 20px", color: COLORS.warmWhite, fontSize: 13 }}>{hasCall ? "📞" : ""}{hasWA ? " 💬" : ""}</td>
-                        <td style={{ padding: "16px 20px", color: COLORS.warmWhite, fontSize: 13 }}>{formatBudget(lead.budget_min, lead.budget_max)}</td>
-                        <td style={{ padding: "16px 20px", color: COLORS.warmWhite, fontSize: 13 }}>{lead.location ?? "—"}</td>
-                        <td style={{ padding: "16px 20px", color: COLORS.warmWhite, fontSize: 13 }}>{lead.bhk ?? "—"}</td>
-                        <td style={{ padding: "16px 20px" }}>
-                          <span style={badgeStyle(intentColor.bg, intentColor.border, intentColor.color)}>{lead.intent ?? "just_browsing"}</span>
-                        </td>
-                        <td style={{ padding: "16px 20px" }}>
-                          <span style={badgeStyle("rgba(107,107,107,0.1)", "rgba(107,107,107,0.2)", COLORS.warmWhite)}>{lead.timeline ?? "unknown"}</span>
-                        </td>
-                        <td style={{ padding: "16px 20px" }}>
-                          <span style={badgeStyle(stageColor.bg, stageColor.border, stageColor.color)}>{lead.stage}</span>
-                        </td>
-                        <td style={{ padding: "16px 20px", color: COLORS.warmWhite, fontSize: 13 }}>{relativeTime(lead.last_contact_at)}</td>
-                        <td style={{ padding: "16px 20px" }}>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedLead(lead)}
-                            style={{ background: "rgba(201,168,76,0.1)", color: COLORS.gold, border: "1px solid rgba(201,168,76,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s ease" }}
-                          >
-                            View Details
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1.5">
+                              {hasCall && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                  <Phone className="h-2.5 w-2.5" /> Call
+                                </span>
+                              )}
+                              {hasWA && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                  <MessageSquare className="h-2.5 w-2.5" /> WA
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-[#E8E0D0] text-sm whitespace-nowrap">
+                            {formatBudget(lead.budget_min, lead.budget_max)}
+                          </TableCell>
+                          <TableCell>
+                            {lead.location ? (
+                              <span className="flex items-center gap-1 text-[#E8E0D0] text-sm">
+                                <MapPin className="h-3 w-3 text-[#6B6B6B]" />
+                                {lead.location}
+                              </span>
+                            ) : <span className="text-[#6B6B6B]">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            {lead.bhk ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-[#1A1A1A] text-[#E8E0D0] border border-[#C9A84C]/10">
+                                <Home className="h-3 w-3" /> {lead.bhk}
+                              </span>
+                            ) : <span className="text-[#6B6B6B]">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            {lead.intent === "serious_buyer" && (
+                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/15">🔥 Serious</Badge>
+                            )}
+                            {lead.intent === "investor" && (
+                              <Badge className="bg-[#C9A84C]/10 text-[#C9A84C] border-[#C9A84C]/20 hover:bg-[#C9A84C]/15">💼 Investor</Badge>
+                            )}
+                            {lead.intent === "just_browsing" && (
+                              <Badge variant="outline" className="border-[#3A3A3A] text-[#6B6B6B]">Browsing</Badge>
+                            )}
+                            {!lead.intent && <span className="text-[#6B6B6B]">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="border-[#C9A84C]/20 text-[#E8E0D0] bg-[#C9A84C]/5 capitalize whitespace-nowrap"
+                            >
+                              {lead.stage.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="flex items-center gap-1 text-xs text-[#6B6B6B] whitespace-nowrap">
+                              <Clock className="h-3 w-3" />
+                              {relativeTime(lead.last_contact_at)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Events */}
+        <Card className="border-[#C9A84C]/10 bg-[#111111]">
+          <CardHeader className="border-b border-[#C9A84C]/10 pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-[#F5F0E8] text-base font-semibold">Recent Events</CardTitle>
+              <Badge className="bg-[#C9A84C]/10 text-[#C9A84C] border-[#C9A84C]/20">{events.length} total</Badge>
             </div>
-          )}
-        </div>
-
-        <div style={{ background: COLORS.deepBlack, border: "1px solid rgba(201,168,76,0.1)", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "12px 20px", background: COLORS.black, borderBottom: "1px solid rgba(201,168,76,0.1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ color: COLORS.offWhite, fontWeight: 700 }}>Recent Events</div>
-            <div style={{ color: COLORS.muted, fontSize: 12 }}>{events.length} total</div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-            {events.slice(0, 8).map((event) => {
-              const isInbound = event.direction === "inbound";
-              const extracted = event.extracted_fields ?? {};
-              const summary = safeText(extracted.summary) ?? event.transcript ?? null;
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            {events.slice(0, 6).map((event) => {
+              const inbound = event.direction === "inbound"
+              const extracted = event.extracted_fields ?? {}
+              const summary = safeText(extracted.summary) ?? event.transcript?.slice(0, 120) ?? null
               return (
-                <div key={event.id} style={{ background: "#0F0F0F", border: "1px solid rgba(201,168,76,0.1)", borderRadius: 12, overflow: "hidden" }}>
-                  <div style={{ background: COLORS.black, borderBottom: "1px solid rgba(201,168,76,0.08)", padding: "12px 14px", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                    <div>
-                      <div style={{ color: COLORS.offWhite, fontSize: 13, fontWeight: 600 }}>{event.lead_phone}</div>
-                      <div style={{ marginTop: 4, ...badgeStyle(isInbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", isInbound ? "rgba(16,185,129,0.2)" : "rgba(59,130,246,0.2)", isInbound ? "#10B981" : "#60A5FA") }}>
-                        {isInbound ? "Inbound" : "Outbound"}
+                <div key={event.id} className="rounded-xl border border-[#C9A84C]/8 bg-[#0F0F0F] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#C9A84C]/8 bg-[#0A0A0A]">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${event.channel === "whatsapp" ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"}`}>
+                        {event.channel === "whatsapp" ? <MessageSquare className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[#F5F0E8]">{event.lead_phone}</p>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${inbound ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"}`}>
+                          {inbound ? "Inbound" : "Outbound"}
+                        </span>
                       </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ color: COLORS.gold, fontSize: 12, fontWeight: 600 }}>{formatDuration(event.duration_sec)}</div>
-                      <div style={{ color: COLORS.muted, fontSize: 11 }}>{relativeTime(event.created_at)}</div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-[#C9A84C]">{formatDuration(event.duration_sec)}</p>
+                      <p className="text-xs text-[#6B6B6B]">{relativeTime(event.created_at)}</p>
                     </div>
                   </div>
-
-                  <div style={{ padding: 14 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: summary ? 10 : 0 }}>
-                      {[
-                        ["Name", safeText(extracted.name)],
-                        ["Budget", safeText(extracted.budget_min_lakhs) ? `₹${safeText(extracted.budget_min_lakhs)}–${safeText(extracted.budget_max_lakhs) ?? ""}L` : null],
-                        ["Location", safeText(extracted.location)],
-                        ["BHK", safeText(extracted.bhk)],
-                        ["Intent", safeText(extracted.intent)],
-                        ["Timeline", safeText(extracted.timeline)],
-                      ].map(([label, value]) => (
-                        <div key={label} style={{ background: COLORS.charcoal, borderRadius: 8, padding: 10, border: "1px solid rgba(201,168,76,0.08)" }}>
-                          <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
-                          <div style={{ color: COLORS.offWhite, fontSize: 12, fontWeight: 600 }}>{value ?? "—"}</div>
-                        </div>
-                      ))}
+                  {summary && (
+                    <div className="px-4 py-3">
+                      <p className="text-xs text-[#E8E0D0]/70 leading-relaxed line-clamp-2">{summary}</p>
                     </div>
-
-                    {summary && (
-                      <div style={{ background: "rgba(201,168,76,0.04)", border: "1px solid rgba(201,168,76,0.15)", borderLeft: `3px solid ${COLORS.darkGold}`, borderRadius: 10, padding: 12, color: COLORS.gold, fontSize: 12, lineHeight: 1.8 }}>
-                        {summary}
-                      </div>
-                    )}
-
-                    {event.transcript && (
-                      <details style={{ marginTop: 10 }}>
-                        <summary style={{ cursor: "pointer", color: COLORS.gold, fontSize: 13, fontWeight: 600, listStyle: "none" }}>Transcript</summary>
-                        <div style={{ marginTop: 10, background: "#050505", border: "1px solid rgba(201,168,76,0.1)", color: COLORS.gold, borderRadius: 8, padding: 16, fontFamily: "monospace", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{event.transcript}</div>
-                      </details>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
+              )
             })}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </main>
 
-      {selectedLead && (
-        <div onClick={() => setSelectedLead(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 900, maxHeight: "90vh", overflow: "hidden", borderRadius: 20, background: COLORS.deepBlack, border: "1px solid rgba(201,168,76,0.2)", boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(201,168,76,0.1)" }}>
-            <div style={{ padding: 20, background: "linear-gradient(135deg, #111111, #1A1A0A)", borderBottom: "1px solid rgba(201,168,76,0.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg, #C9A84C, #A07830)", color: COLORS.black, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, boxShadow: "0 8px 24px rgba(201,168,76,0.15)" }}>
-                  {(selectedLead.name ?? selectedLead.phone)[0].toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ color: COLORS.offWhite, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>{selectedLead.name ?? "Unknown"}</div>
-                  <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>{selectedLead.phone}</div>
+      {/* Lead Detail Modal */}
+      <Dialog open={!!selectedLead} onOpenChange={() => { setSelectedLead(null); setReplyText(""); setReplySent(false) }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-[#111111] border-[#C9A84C]/20 text-[#F5F0E8] p-0">
+          {selectedLead && (
+            <>
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-[#C9A84C]/10 bg-gradient-to-r from-[#111111] to-[#1A1A0A]">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#C9A84C] to-[#A07830] flex items-center justify-center text-[#0A0A0A] text-xl font-extrabold shadow-lg shadow-[#C9A84C]/15">
+                    {(selectedLead.name ?? selectedLead.phone)[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl font-bold text-[#F5F0E8]">
+                      {selectedLead.name ?? "Unknown"}
+                    </DialogTitle>
+                    <p className="text-sm text-[#6B6B6B] mt-0.5">{selectedLead.phone}</p>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedLead(null)} style={{ background: "rgba(201,168,76,0.1)", color: COLORS.gold, border: "1px solid rgba(201,168,76,0.2)", borderRadius: 8, width: 34, height: 34, cursor: "pointer", fontSize: 18 }}>×</button>
-            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", maxHeight: "calc(90vh - 90px)" }}>
-              <div style={{ background: "#0F0F0F", borderRight: "1px solid rgba(201,168,76,0.1)", padding: 20, overflowY: "auto" }}>
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 10, color: COLORS.gold, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>Lead Summary</div>
-                  <div style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.2)", borderLeft: `3px solid ${COLORS.gold}`, borderRadius: 10, padding: 14, color: COLORS.offWhite, fontSize: 13, lineHeight: 1.7 }}>{selectedLead.summary ?? "No AI summary available yet."}</div>
-                </div>
+              <div className="p-6 space-y-6">
+                {/* Summary */}
+                {selectedLead.summary && (
+                  <div className="p-4 rounded-xl bg-[#C9A84C]/6 border border-[#C9A84C]/20 border-l-4 border-l-[#C9A84C]">
+                    <p className="text-[10px] font-bold text-[#C9A84C] uppercase tracking-widest mb-2">AI Summary</p>
+                    <p className="text-sm text-[#F5F0E8] leading-relaxed">{selectedLead.summary}</p>
+                  </div>
+                )}
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+                {/* Lead Info Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    ["Budget", formatBudget(selectedLead.budget_min, selectedLead.budget_max)],
-                    ["Location", selectedLead.location ?? "—"],
-                    ["BHK", selectedLead.bhk ?? "—"],
-                    ["Intent", selectedLead.intent ?? "—"],
-                    ["Timeline", selectedLead.timeline ?? "—"],
-                    ["Stage", selectedLead.stage],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ background: COLORS.charcoal, borderRadius: 10, border: "1px solid rgba(201,168,76,0.08)", padding: 10 }}>
-                      <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
-                      <div style={{ color: COLORS.offWhite, fontSize: 14, fontWeight: 600 }}>{value}</div>
+                    { label: "Budget", value: formatBudget(selectedLead.budget_min, selectedLead.budget_max), icon: IndianRupee },
+                    { label: "Location", value: selectedLead.location ?? "—", icon: MapPin },
+                    { label: "BHK", value: selectedLead.bhk ?? "—", icon: Home },
+                    { label: "Intent", value: selectedLead.intent?.replace("_", " ") ?? "—", icon: Target },
+                    { label: "Timeline", value: selectedLead.timeline?.replace(/_/g, " ") ?? "—", icon: Calendar },
+                    { label: "Stage", value: selectedLead.stage.replace("_", " "), icon: TrendingUp },
+                  ].map(({ label, value, icon: Icon }) => (
+                    <div key={label} className="p-3 rounded-xl bg-[#1A1A1A] border border-[#C9A84C]/8">
+                      <p className="text-[10px] font-semibold text-[#6B6B6B] uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <Icon className="h-3 w-3" /> {label}
+                      </p>
+                      <p className="text-sm font-semibold text-[#F5F0E8] capitalize">{value}</p>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => copyPhone(selectedLead.phone)} style={{ flex: 1, background: "rgba(201,168,76,0.1)", color: COLORS.gold, border: "1px solid rgba(201,168,76,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{copiedPhone === selectedLead.phone ? "Copied" : "Copy phone"}</button>
-                  <a href={`tel:${selectedLead.phone}`} style={{ flex: 1, textAlign: "center", textDecoration: "none", background: "rgba(201,168,76,0.1)", color: COLORS.gold, border: "1px solid rgba(201,168,76,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 12, fontWeight: 600 }}>Call</a>
+                {/* Actions */}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => copyPhone(selectedLead.phone)}
+                    variant="outline"
+                    className="flex-1 border-[#C9A84C]/20 text-[#C9A84C] hover:bg-[#C9A84C]/10 bg-[#C9A84C]/5"
+                  >
+                    {copiedPhone === selectedLead.phone ? (
+                      <><CheckCircle2 className="mr-2 h-4 w-4" /> Copied!</>
+                    ) : (
+                      <><Copy className="mr-2 h-4 w-4" /> Copy Phone</>
+                    )}
+                  </Button>
+                  <Button asChild className="flex-1 bg-gradient-to-r from-[#C9A84C] to-[#F0C040] hover:from-[#F0C040] hover:to-[#C9A84C] text-[#0A0A0A] font-semibold">
+                    <a href={`tel:${selectedLead.phone}`}>
+                      <Phone className="mr-2 h-4 w-4" /> Call Now
+                    </a>
+                  </Button>
                 </div>
-              </div>
 
-              <div style={{ background: COLORS.deepBlack, padding: 20, overflowY: "auto" }}>
-                <div style={{ fontSize: 10, color: COLORS.gold, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>Timeline ({selectedEvents.length})</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {selectedEvents.length === 0 ? (
-                    <div style={{ color: COLORS.muted, fontSize: 13, padding: 20 }}>No events yet.</div>
-                  ) : (
-                    selectedEvents.map((event) => {
-                      const inbound = event.direction === "inbound";
-                      const extracted = event.extracted_fields ?? {};
-                      const summary = safeText(extracted.summary) ?? event.transcript ?? null;
-                      return (
-                        <div key={event.id} style={{ background: "#0F0F0F", border: "1px solid rgba(201,168,76,0.1)", borderRadius: 12, overflow: "hidden" }}>
-                          <div style={{ background: COLORS.black, borderBottom: "1px solid rgba(201,168,76,0.08)", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div style={{ width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: inbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", color: inbound ? "#10B981" : "#60A5FA" }}>{inbound ? "📲" : "📤"}</div>
-                              <div>
-                                <div style={{ color: COLORS.offWhite, fontSize: 13, fontWeight: 700 }}>{event.channel} · {event.direction}</div>
-                                <div style={{ marginTop: 4, ...badgeStyle(inbound ? "rgba(16,185,129,0.1)" : "rgba(59,130,246,0.1)", inbound ? "rgba(16,185,129,0.2)" : "rgba(59,130,246,0.2)", inbound ? "#10B981" : "#60A5FA") }}>
-                                  {event.lead_phone}
+                {/* WhatsApp Reply */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-[#6B6B6B] uppercase tracking-widest">Reply on WhatsApp</p>
+                  <div className="flex gap-2 items-end">
+                    <Textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendReply())}
+                      placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+                      className="bg-[#1A1A1A] border-[#C9A84C]/20 text-[#F5F0E8] placeholder:text-[#6B6B6B] focus:border-[#C9A84C]/50 min-h-[72px] resize-none"
+                      disabled={replySending}
+                    />
+                    <Button
+                      onClick={sendReply}
+                      disabled={replySending || !replyText.trim()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 self-end h-10"
+                    >
+                      {replySending ? <Loader2 className="h-4 w-4 animate-spin" /> : replySent ? <CheckCircle2 className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Timeline */}
+                <div>
+                  <p className="text-xs font-bold text-[#C9A84C] uppercase tracking-widest mb-3">
+                    Timeline ({selectedEvents.length})
+                  </p>
+                  <div className="space-y-3">
+                    {selectedEvents.length === 0 ? (
+                      <p className="text-[#6B6B6B] text-center py-8">No events yet</p>
+                    ) : (
+                      selectedEvents.map((event) => {
+                        const inbound = event.direction === "inbound"
+                        const extracted = event.extracted_fields ?? {}
+                        const summary = safeText(extracted.summary) ?? event.transcript ?? null
+                        return (
+                          <div key={event.id} className="rounded-xl border border-[#C9A84C]/8 bg-[#0F0F0F] overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-[#C9A84C]/8 bg-[#0A0A0A]">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${event.channel === "whatsapp" ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"}`}>
+                                  {event.channel === "whatsapp" ? <MessageSquare className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-[#F5F0E8] capitalize">
+                                    {event.channel} · {event.direction}
+                                  </p>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${inbound ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"}`}>
+                                    {inbound ? "Inbound" : "Outbound"}
+                                  </span>
                                 </div>
                               </div>
-                            </div>
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ color: COLORS.gold, fontSize: 13, fontWeight: 700 }}>{formatDuration(event.duration_sec)}</div>
-                              <div style={{ color: COLORS.muted, fontSize: 11 }}>{relativeTime(event.created_at)}</div>
-                            </div>
-                          </div>
-
-                          <div style={{ padding: 14 }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: summary ? 10 : 0 }}>
-                              {[
-                                ["Name", safeText(extracted.name)],
-                                ["Budget", safeText(extracted.budget_min_lakhs) ? `₹${safeText(extracted.budget_min_lakhs)}–${safeText(extracted.budget_max_lakhs) ?? ""}L` : null],
-                                ["Location", safeText(extracted.location)],
-                                ["BHK", safeText(extracted.bhk)],
-                                ["Intent", safeText(extracted.intent)],
-                                ["Timeline", safeText(extracted.timeline)],
-                              ].map(([label, value]) => (
-                                <div key={label} style={{ background: COLORS.charcoal, borderRadius: 8, padding: 10, border: "1px solid rgba(201,168,76,0.08)" }}>
-                                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
-                                  <div style={{ color: COLORS.offWhite, fontSize: 12, fontWeight: 600 }}>{value ?? "—"}</div>
-                                </div>
-                              ))}
-                            </div>
-
-                            {summary && (
-                              <div style={{ background: "rgba(201,168,76,0.04)", border: "1px solid rgba(201,168,76,0.15)", borderLeft: `3px solid ${COLORS.darkGold}`, borderRadius: 10, padding: 12, color: COLORS.gold, fontSize: 12, lineHeight: 1.8 }}>
-                                {summary}
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#C9A84C]">{formatDuration(event.duration_sec)}</p>
+                                <p className="text-xs text-[#6B6B6B]">{relativeTime(event.created_at)}</p>
                               </div>
-                            )}
+                            </div>
 
-                            {event.transcript && (
-                              <details style={{ marginTop: 10 }}>
-                                <summary style={{ cursor: "pointer", color: COLORS.gold, fontSize: 13, fontWeight: 600, listStyle: "none" }}>Transcript</summary>
-                                <div style={{ marginTop: 10, background: "#050505", border: "1px solid rgba(201,168,76,0.1)", color: COLORS.gold, borderRadius: 8, padding: 16, fontFamily: "monospace", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{event.transcript}</div>
-                              </details>
-                            )}
+                            <div className="p-4 space-y-3">
+                              <div className="grid grid-cols-3 gap-2">
+                                {[
+                                  ["Name", safeText(extracted.name)],
+                                  ["Budget", safeText(extracted.budget_min_lakhs) ? `₹${safeText(extracted.budget_min_lakhs)}–${safeText(extracted.budget_max_lakhs) ?? ""}L` : null],
+                                  ["Location", safeText(extracted.location)],
+                                ].map(([label, value]) => (
+                                  <div key={label} className="bg-[#1A1A1A] rounded-lg p-2.5 border border-[#C9A84C]/8">
+                                    <p className="text-[10px] text-[#6B6B6B] uppercase tracking-wider mb-1">{label}</p>
+                                    <p className="text-xs font-semibold text-[#F5F0E8]">{value ?? "—"}</p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {summary && (
+                                <div className="p-3 rounded-lg bg-[#C9A84C]/4 border border-[#C9A84C]/15 border-l-2 border-l-[#C9A84C]/60">
+                                  <p className="text-xs text-[#E8E0D0] leading-relaxed">{summary}</p>
+                                </div>
+                              )}
+
+                              {event.transcript && (
+                                <details className="group">
+                                  <summary className="cursor-pointer text-xs text-[#C9A84C] font-semibold flex items-center gap-1.5 hover:text-[#F0C040] transition-colors select-none">
+                                    <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                                    View full transcript
+                                  </summary>
+                                  <div className="mt-2 p-3 rounded-lg bg-[#050505] border border-[#C9A84C]/10 text-xs text-[#C9A84C]/80 font-mono whitespace-pre-wrap leading-relaxed">
+                                    {event.transcript}
+                                  </div>
+                                </details>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        )
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-  );
+  )
 }
