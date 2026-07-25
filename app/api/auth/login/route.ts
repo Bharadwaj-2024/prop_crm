@@ -14,8 +14,14 @@ function getSupabase() {
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
+    const normalizedEmail = typeof email === "string" ? email.toLowerCase().trim() : "";
 
-    if (!email || !password) {
+    console.log("[auth/login] request received", {
+      email: normalizedEmail,
+      hasPassword: Boolean(password),
+    });
+
+    if (!normalizedEmail || !password) {
       return NextResponse.json(
         { error: "Email and password required" },
         { status: 400 }
@@ -24,12 +30,23 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase();
 
-    const { data: broker } = await supabase
+    // Fetch broker
+    const { data: broker, error: brokerError } = await supabase
       .from("brokers")
       .select("*")
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", normalizedEmail)
       .eq("is_active", true)
       .single();
+
+    if (brokerError) {
+      console.log("[auth/login] broker query error", brokerError.message);
+    }
+
+    console.log("[auth/login] broker lookup result", {
+      found: Boolean(broker),
+      brokerId: broker?.id,
+      brokerEmail: broker?.email,
+    });
 
     if (!broker) {
       return NextResponse.json(
@@ -38,6 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check lockout
     if (broker.locked_until && new Date(broker.locked_until) > new Date()) {
       const mins = Math.ceil(
         (new Date(broker.locked_until).getTime() - Date.now()) / 60000
@@ -48,11 +66,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verify password
+    console.log("[auth/login] comparing password hash");
     const valid = await bcrypt.compare(password, broker.password_hash);
+    console.log("[auth/login] password comparison result", { valid });
 
     if (!valid) {
       const newCount = (broker.failed_login_count ?? 0) + 1;
       const shouldLock = newCount >= 5;
+
       await supabase
         .from("brokers")
         .update({
@@ -69,6 +91,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Reset failed attempts
     await supabase
       .from("brokers")
       .update({
@@ -78,24 +101,8 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", broker.id);
 
-    const userAgent = req.headers.get("user-agent") ?? "unknown";
-    const ipAddress = req.headers.get("x-forwarded-for") ?? "unknown";
-
-    await supabase.from("auth_users").upsert(
-      {
-        broker_id: broker.id,
-        email: broker.email,
-        name: broker.name,
-        role: broker.role,
-        agency_id: broker.agency_id ?? null,
-        user_agent: userAgent,
-        ip_address: ipAddress,
-        last_login_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "broker_id" }
-    );
-
+    // Sign access token
+    console.log("[auth/login] signing access token");
     const accessToken = await signAccessToken({
       brokerId: broker.id,
       email: broker.email,
@@ -104,6 +111,7 @@ export async function POST(req: NextRequest) {
       agencyId: broker.agency_id ?? undefined,
     });
 
+    // Create refresh token
     const refreshToken = uuidv4() + "-" + uuidv4();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
@@ -114,6 +122,8 @@ export async function POST(req: NextRequest) {
       ip_address: req.headers.get("x-forwarded-for") ?? "unknown",
       expires_at: expiresAt.toISOString(),
     });
+
+    console.log("[auth/login] login successful", { brokerId: broker.id });
 
     const response = NextResponse.json({
       ok: true,
@@ -136,8 +146,9 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
+
   } catch (err) {
-    console.error("[auth/login]", err);
+    console.error("[auth/login] fatal error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

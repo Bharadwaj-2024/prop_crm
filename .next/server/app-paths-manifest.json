@@ -1,6 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/api/dashboard/data/route": "app/api/dashboard/data/route.js"
+  "/api/dashboard/data/route": "app/api/dashboard/data/route.js",
+  "/api/webhooks/exotel/route": "app/api/webhooks/exotel/route.js"
 }

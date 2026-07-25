@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/lib/hooks/use-toast"
+import { authFetch } from "@/lib/auth/apiClient"
 import {
   Phone,
   MessageSquare,
@@ -124,9 +125,8 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/dashboard/data", {
+      const res = await authFetch("/api/dashboard/data", {
         cache: "no-store",
-        credentials: "include",
       })
       const data = await res.json()
       if (!res.ok) {
@@ -188,7 +188,7 @@ export default function DashboardPage() {
     if (!selectedLead || !replyText.trim()) return
     setReplySending(true)
     try {
-      const res = await fetch("/api/whatsapp/send", {
+      const res = await authFetch("/api/whatsapp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: selectedLead.phone, message: replyText }),

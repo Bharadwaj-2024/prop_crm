@@ -1,34 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 
+const PUBLIC_PATHS = ["/api/auth", "/api/webhooks", "/login", "/_next", "/favicon.ico"];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname === "/" || pathname === "/login") {
+  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  if (
-    pathname.startsWith("/api/auth/login") ||
-    pathname.startsWith("/api/auth/refresh") ||
-    pathname.startsWith("/api/auth/logout") ||
-    pathname.startsWith("/api/webhooks/exotel") ||
-    pathname.startsWith("/api/webhooks/whatsapp")
-  ) {
-    return NextResponse.next();
+  if (pathname.startsWith("/api/")) {
+    const token = req.headers.get("authorization");
+    if (!token) {
+      return NextResponse.json({ error: "Authorization required" }, { status: 401 });
+    }
+
+    try {
+      await verifyAccessToken(token.replace(/^Bearer\s+/i, ""));
+      return NextResponse.next();
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
   }
 
   if (pathname.startsWith("/dashboard")) {
     const token = req.cookies.get("session_token")?.value;
     if (!token) {
-      return NextResponse.redirect(new URL("/", req.url));
+      return NextResponse.redirect(new URL("/login", req.url));
     }
 
     try {
       await verifyAccessToken(token);
       return NextResponse.next();
     } catch {
-      const response = NextResponse.redirect(new URL("/", req.url));
+      const response = NextResponse.redirect(new URL("/login", req.url));
       response.cookies.delete("session_token");
       return response;
     }
@@ -38,5 +44,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/dashboard/:path*", "/api/((?!auth|webhooks).)*"],
 };

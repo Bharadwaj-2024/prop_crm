@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken, extractBearerToken } from "@/lib/auth/jwt";
 
 const PUBLIC_PATHS = [
-  "/api/auth/login",
-  "/api/auth/refresh",
-  "/api/auth/logout",
-  "/api/webhooks/exotel",
-  "/api/webhooks/whatsapp",
+  "/api/auth",
+  "/api/webhooks",
   "/login",
   "/_next",
   "/favicon.ico",
@@ -15,10 +12,12 @@ const PUBLIC_PATHS = [
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Allow all public paths
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
+  // For API routes: check Authorization header
   if (pathname.startsWith("/api/")) {
     const token = extractBearerToken(req.headers.get("authorization"));
     if (!token) {
@@ -38,16 +37,19 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // For page routes: check session cookie
   const sessionToken = req.cookies.get("session_token")?.value;
   if (!sessionToken) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   try {
     await verifyAccessToken(sessionToken);
     return NextResponse.next();
   } catch {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
   }
 }
 

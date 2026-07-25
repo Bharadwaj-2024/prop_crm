@@ -1,8 +1,18 @@
-import "dotenv/config";
-import { startCallWorker } from "../lib/workers/callWorker";
+import * as dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+
 import { startWhatsAppWorker } from "../lib/workers/whatsappWorker";
 
-startCallWorker();
-startWhatsAppWorker();
+const worker = startWhatsAppWorker();
 
-console.log("[all-workers] Both call and WhatsApp workers started.");
+process.on("SIGTERM", async () => {
+  console.log("[startWhatsAppWorker] SIGTERM received. Shutting down gracefully...");
+  await worker.close();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("[startWhatsAppWorker] SIGINT received. Shutting down...");
+  await worker.close();
+  process.exit(0);
+});

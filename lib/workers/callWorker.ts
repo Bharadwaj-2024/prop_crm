@@ -16,6 +16,7 @@ import { Worker, Job } from "bullmq";
 import { CALL_QUEUE_NAME, redisConnection, CallJobPayload } from "@/lib/queues/callQueue";
 import { transcribeAudioUrl } from "@/lib/services/sarvam";
 import { extractLeadFields } from "@/lib/services/extractLeadFields";
+import { scheduleFollowUps } from "@/lib/services/scheduleFollowUps";
 import { upsertLeadAndEvent } from "@/lib/supabase/upsertLead";
 
 // ----------------------------------------------------------------
@@ -94,6 +95,8 @@ async function processCallJob(job: Job<CallJobPayload>): Promise<void> {
     transcript,
     intentTag: fields.intent ?? null,
   });
+
+  await scheduleFollowUps(from, fields);
 
   console.log(`[worker] ✅ Job ${job.id} complete for ${from}`);
 }

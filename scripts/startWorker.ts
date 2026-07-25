@@ -17,18 +17,22 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 import { startCallWorker } from "../lib/workers/callWorker";
+import { startFollowUpWorker } from "../lib/workers/followUpWorker";
 
 const worker = startCallWorker();
+const followUpWorker = startFollowUpWorker();
 
 // Graceful shutdown on SIGTERM (e.g. from Docker / Railway)
 process.on("SIGTERM", async () => {
   console.log("[startWorker] SIGTERM received. Shutting down gracefully...");
   await worker.close();
+  await followUpWorker.close();
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   console.log("[startWorker] SIGINT received. Shutting down...");
   await worker.close();
+  await followUpWorker.close();
   process.exit(0);
 });
