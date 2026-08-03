@@ -12,11 +12,30 @@ type FollowUpRow = {
   follow_up_day: number;
 };
 
+function formatWorkerErrorMessage(message: string, details?: string) {
+  const raw = `${message} ${details ?? ""}`.trim();
+  const normalized = raw.replace(/\s+/g, " ").trim();
+
+  if (/<!DOCTYPE html>|<html|Error code 521|Web server is down/i.test(raw)) {
+    return "Supabase returned a Cloudflare 521 error. Check that NEXT_PUBLIC_SUPABASE_URL points to a live Supabase project and try again.";
+  }
+
+  return normalized || "Unknown follow-up worker error";
+}
+
 function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || url === "https://your-project-id.supabase.co") {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set correctly in .env.local");
+  }
+
+  if (!key || key === "your_supabase_service_role_key_here") {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set correctly in .env.local");
+  }
+
+  return createClient(url, key);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -37,7 +56,7 @@ async function processPendingFollowUps(): Promise<void> {
 
   if (error) {
     console.error(
-      `[follow-up-worker] Failed to fetch pending follow-ups: ${error.message}`
+      `[follow-up-worker] Failed to fetch pending follow-ups: ${formatWorkerErrorMessage(error.message, error.details)}`
     );
     return;
   }
@@ -119,7 +138,12 @@ export function startFollowUpWorker() {
     try {
       await processPendingFollowUps();
     } catch (error) {
-      console.error("[follow-up-worker] Worker cycle error:", error);
+      const message =
+        error instanceof Error
+          ? formatWorkerErrorMessage(error.message)
+          : "Unknown follow-up worker error";
+
+      console.error(`[follow-up-worker] Worker cycle error: ${message}`);
     } finally {
       isRunning = false;
     }

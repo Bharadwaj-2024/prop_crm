@@ -9,6 +9,14 @@ export interface WhatsAppSendResult {
   error?: string;
 }
 
+type MetaErrorPayload = {
+  error?: {
+    message?: string;
+    code?: number;
+    type?: string;
+  };
+};
+
 function getPhoneNumberId(): string {
   const id = process.env.WHATSAPP_PHONE_NUMBER_ID;
   if (!id) {
@@ -48,7 +56,7 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
     const parsedBody = rawText ? safeJsonParse(rawText) : null;
 
     if (!res.ok) {
-      const errorMessage = `[whatsapp-service] Send failed (${res.status}): ${rawText}`;
+      const errorMessage = formatWhatsAppError(res.status, parsedBody, rawText);
       console.error(errorMessage);
       return {
         ok: false,
@@ -78,48 +86,29 @@ export async function sendWhatsAppReply(
   to: string,
   fields: ExtractedLeadFields
 ): Promise<WhatsAppSendResult> {
-  let message: string;
+  const name = fields.name ? `Hi ${fields.name}!` : "Hi!";
+  const details: string[] = [];
 
-  const hasDetails = Boolean(
-    fields.budget_min_lakhs || fields.budget_max_lakhs || fields.location || fields.bhk
-  );
+  if (fields.bhk) {
+    details.push(fields.bhk);
+  }
 
-  if (hasDetails) {
-    const lines: string[] = [];
-    const name = fields.name ? `Hi ${fields.name}!` : "Hi!";
-    lines.push(name);
-    lines.push("");
-    lines.push("Thanks for reaching out to us.");
-    lines.push("");
+  if (fields.location) {
+    details.push(`in ${fields.location}`);
+  }
 
-    if (fields.budget_min_lakhs || fields.budget_max_lakhs) {
-      if (fields.budget_min_lakhs && fields.budget_max_lakhs) {
-        lines.push(`Budget noted: Rs ${fields.budget_min_lakhs}-${fields.budget_max_lakhs} Lakhs`);
-      } else if (fields.budget_min_lakhs) {
-        lines.push(`Budget noted: Rs ${fields.budget_min_lakhs}L+`);
-      } else {
-        lines.push(`Budget noted: Up to Rs ${fields.budget_max_lakhs}L`);
-      }
-    }
+  let message = `${name} Thank you for sharing your requirement. I will update you shortly with matching property options.`;
 
-    if (fields.location) {
-      lines.push(`Area: ${fields.location}`);
-    }
+  if (details.length > 0) {
+    message += ` Noted: ${details.join(" ")}.`;
+  }
 
-    if (fields.bhk) {
-      lines.push(`Looking for: ${fields.bhk}`);
-    }
-
-    lines.push("");
-    lines.push("I will share the best matching properties shortly.");
-    lines.push("");
-    lines.push("Our team will call you within 2 hours.");
-    lines.push("");
-    lines.push("- Your Property Advisor");
-    message = lines.join("\n");
-  } else {
-    const name = fields.name ? `Hi ${fields.name}!` : "Hi!";
-    message = `${name} Thanks for your message. I will get back to you shortly with property options. Could you share your budget and preferred area?`;
+  if (fields.budget_min_lakhs && fields.budget_max_lakhs) {
+    message += ` Budget noted: Rs ${fields.budget_min_lakhs}-${fields.budget_max_lakhs} lakhs.`;
+  } else if (fields.budget_min_lakhs) {
+    message += ` Budget noted: Rs ${fields.budget_min_lakhs} lakhs+.`;
+  } else if (fields.budget_max_lakhs) {
+    message += ` Budget noted: up to Rs ${fields.budget_max_lakhs} lakhs.`;
   }
 
   return sendWhatsAppMessage(to, message);
@@ -157,4 +146,21 @@ function safeJsonParse(rawText: string): unknown {
   } catch {
     return rawText;
   }
+}
+
+function formatWhatsAppError(status: number, parsedBody: unknown, rawText: string) {
+  const metaError = parsedBody as MetaErrorPayload | null;
+  const message = metaError?.error?.message;
+  const code = metaError?.error?.code;
+  const type = metaError?.error?.type;
+
+  if (status === 401 || code === 190) {
+    return "[whatsapp-service] Send failed (401): Meta WhatsApp access token is invalid, expired, or does not have permission for this phone number. Update WHATSAPP_ACCESS_TOKEN in .env.local and restart the worker.";
+  }
+
+  if (message) {
+    return `[whatsapp-service] Send failed (${status}): ${message}${code ? ` [code ${code}]` : ""}${type ? ` [${type}]` : ""}`;
+  }
+
+  return `[whatsapp-service] Send failed (${status}): ${rawText}`;
 }

@@ -9,7 +9,7 @@
     "lint": "next lint",
     "worker": "ts-node --project tsconfig.server.json scripts/startWorker.ts",
     "worker:whatsapp": "ts-node --project tsconfig.server.json scripts/startWhatsappWorker.ts",
-    "worker:all": "ts-node --project tsconfig.server.json scripts/startWhatsappWorker.ts",
+    "worker:all": "ts-node --project tsconfig.server.json scripts/startWorker.ts",
     "worker:dev": "nodemon --watch lib --watch scripts --ext ts --exec 'ts-node --project tsconfig.server.json scripts/startWorker.ts'"
   },
   "dependencies": {
@@ -52,3 +52,4 @@
     "typescript": "^5"
   }
 }
+

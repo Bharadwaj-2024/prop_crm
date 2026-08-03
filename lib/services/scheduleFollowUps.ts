@@ -51,7 +51,7 @@ function buildFollowUpMessages(fields: ExtractedLeadFields) {
   return [
     {
       follow_up_day: 0,
-      message: `Hi ${name}! Thanks for calling about ${bhk} in ${location}. I'll share matching properties shortly! ??`,
+      message: `Hi ${name}! Thank you for sharing your requirement for ${bhk} in ${location}. I will update you shortly with matching properties.`,
     },
     {
       follow_up_day: 1,
@@ -67,7 +67,7 @@ function buildFollowUpMessages(fields: ExtractedLeadFields) {
     },
     {
       follow_up_day: 14,
-      message: `Hi ${name}! Final follow up ? we have an exclusive ${bhk} in ${location} within ${budget}. Interested? Reply now! ??`,
+      message: `Hi ${name}! Final follow up: we have an exclusive ${bhk} in ${location} within ${budget}. Interested? Reply now! ??`,
     },
   ];
 }
@@ -147,3 +147,4 @@ export async function scheduleFollowUps(
 
   console.log(`[schedule-follow-up] Day 0 follow-up sent for ${leadPhone}`);
 }
+

@@ -1,11 +1,11 @@
 import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import { createClient } from "@supabase/supabase-js";
-import { CALL_QUEUE_NAME, redisConnection, CallJobPayload } from "@/lib/queues/callQueue";
-import { transcribeAudioUrl } from "@/lib/services/sarvam";
-import { extractLeadFields, ExtractedLeadFields } from "@/lib/services/extractLeadFields";
+import { redisConnection } from "@/lib/queues/callQueue";
+import { WHATSAPP_QUEUE_NAME, WhatsAppJobPayload } from "@/lib/queues/whatsappQueue";
+import { extractFromText } from "@/lib/services/extractFromText";
+import { sendWhatsAppReply } from "@/lib/services/whatsapp";
 import { upsertLeadAndEvent } from "@/lib/supabase/upsertLead";
-import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 
 function getSupabase() {
   return createClient(
@@ -14,172 +14,154 @@ function getSupabase() {
   );
 }
 
-// ----------------------------------------------------------------
-// Schedule follow-up WhatsApp messages after call
-// ----------------------------------------------------------------
-async function scheduleFollowUps(
-  leadPhone: string,
-  fields: ExtractedLeadFields
-): Promise<void> {
+function normalizePhone(phone: string): string {
+  return phone.startsWith("+") ? phone : `+${phone}`;
+}
+
+async function persistIncomingMessage(job: WhatsAppJobPayload): Promise<boolean> {
   const supabase = getSupabase();
 
-  const name     = fields.name     ?? "there";
-  const location = fields.location ?? "your preferred area";
-  const bhk      = fields.bhk      ?? "property";
-  const budget   = fields.budget_min_lakhs
-    ? `₹${fields.budget_min_lakhs}-${fields.budget_max_lakhs}L`
-    : "your budget";
+  const { data, error } = await supabase
+    .from("whatsapp_messages")
+    .select("processed")
+    .eq("wamid", job.wamid)
+    .maybeSingle();
 
-  const messages = [
-    {
-      day: 0,
-      message: `Hi ${name}! 👋 Thanks for calling us about ${bhk} in ${location}. I'll share the best matching properties shortly! 🏠`,
-    },
-    {
-      day: 1,
-      message: `Hi ${name}! Following up on your search for ${bhk} in ${location} within ${budget}. I have 3 excellent options ready. When can we schedule a site visit? 🏠`,
-    },
-    {
-      day: 3,
-      message: `Hi ${name}! Still looking for ${bhk} in ${location}? We have new listings within ${budget}. Reply to see options! 🏡`,
-    },
-    {
-      day: 7,
-      message: `Hi ${name}! Properties in ${location} are selling fast. Don't miss out — reply YES to see latest options in ${budget}. 🔥`,
-    },
-    {
-      day: 14,
-      message: `Hi ${name}! Final follow up — we have an exclusive ${bhk} in ${location} within ${budget}. Interested? Reply now! 🏠`,
-    },
-  ];
-
-  const now = new Date();
-  const rows = messages.map((m) => ({
-    lead_phone:   leadPhone,
-    message:      m.message,
-    scheduled_at: new Date(now.getTime() + m.day * 24 * 60 * 60 * 1000).toISOString(),
-    follow_up_day: m.day,
-    status:       "pending",
-  }));
-
-  // Send day 0 message immediately via WhatsApp
-  try {
-    await sendWhatsAppMessage(leadPhone, messages[0].message);
-    console.log(`[follow-up] ✅ Immediate message sent to ${leadPhone}`);
-    rows[0].status = "sent";
-  } catch (err) {
-    console.error(`[follow-up] ❌ Failed to send immediate message:`, err);
+  if (!error && data?.processed) {
+    console.log(`[whatsapp-worker] Message ${job.wamid} already processed. Skipping.`);
+    return true;
   }
 
-  // Save all follow-ups to database
-  const { error } = await supabase.from("follow_ups").insert(rows);
+  if (error && !error.message.includes("relation") && !error.message.includes("does not exist")) {
+    throw new Error(`[whatsapp-worker] Failed to check message ${job.wamid}: ${error.message}`);
+  }
+
+  const { error: upsertError } = await supabase
+    .from("whatsapp_messages")
+    .upsert({
+      wamid: job.wamid,
+      from_phone: normalizePhone(job.fromPhone),
+      to_phone: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "unknown",
+      message_type: job.messageType,
+      message_body: job.messageBody || null,
+      media_id: job.mediaId ?? null,
+      timestamp: job.timestamp,
+      processed: false,
+    }, { onConflict: "wamid" });
+
+  if (upsertError) {
+    if (upsertError.message.includes("relation") || upsertError.message.includes("does not exist")) {
+      console.warn("[whatsapp-worker] whatsapp_messages table is missing; continuing without raw message persistence");
+      return false;
+    }
+
+    throw new Error(`[whatsapp-worker] Failed to persist message ${job.wamid}: ${upsertError.message}`);
+  }
+
+  return false;
+}
+
+async function markMessageProcessed(wamid: string): Promise<void> {
+  const supabase = getSupabase();
+
+  const { error } = await supabase
+    .from("whatsapp_messages")
+    .update({ processed: true })
+    .eq("wamid", wamid);
+
   if (error) {
-    console.error("[follow-up] Failed to schedule:", error.message);
-  } else {
-    console.log(`[follow-up] ✅ Scheduled ${rows.length} messages for ${leadPhone}`);
+    if (error.message.includes("relation") || error.message.includes("does not exist")) {
+      return;
+    }
+
+    throw new Error(`[whatsapp-worker] Failed to mark ${wamid} as processed: ${error.message}`);
   }
 }
 
-// ----------------------------------------------------------------
-// Fetch recording URL from Exotel
-// ----------------------------------------------------------------
-async function fetchRecordingUrl(callSid: string): Promise<string> {
-  const apiKey   = process.env.EXOTEL_API_KEY!;
-  const apiToken = process.env.EXOTEL_API_TOKEN!;
-  const sid      = process.env.EXOTEL_SID!;
-
-  const url = `https://api.exotel.com/v1/Accounts/${sid}/Calls/${callSid}.json`;
-
-  const res = await fetch(url, {
-    headers: {
-      Authorization: "Basic " + Buffer.from(`${apiKey}:${apiToken}`).toString("base64"),
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`[worker] Exotel call fetch failed (${res.status}) for ${callSid}: ${body}`);
+function buildMessageText(job: WhatsAppJobPayload): string {
+  const trimmedBody = job.messageBody.trim();
+  if (trimmedBody) {
+    return trimmedBody;
   }
 
-  const data = await res.json();
-  const recordingUrl: string | undefined =
-    data?.Call?.RecordingUrl ?? data?.recording_url;
-
-  if (!recordingUrl) {
-    throw new Error(`[worker] Recording URL not yet available for ${callSid}. Will retry.`);
+  if (job.messageType === "audio") {
+    return "Customer sent a WhatsApp audio message.";
   }
 
-  return recordingUrl;
+  if (job.messageType === "image") {
+    return "Customer sent a WhatsApp image.";
+  }
+
+  if (job.messageType === "document") {
+    return "Customer sent a WhatsApp document.";
+  }
+
+  return "Customer sent a WhatsApp message.";
 }
 
-// ----------------------------------------------------------------
-// Main job processor
-// ----------------------------------------------------------------
-async function processCallJob(job: Job<CallJobPayload>): Promise<void> {
-  const { callSid, from, direction, durationSec, recordingUrl: payloadUrl } = job.data;
-
-  console.log(`[worker] Processing job ${job.id} | callSid=${callSid} | from=${from} | attempt=${job.attemptsMade + 1}`);
-
-  // Step 1 — get recording URL
-  let recordingUrl = payloadUrl;
-  if (!recordingUrl) {
-    console.log(`[worker] No recording URL in payload. Fetching from Exotel...`);
-    recordingUrl = await fetchRecordingUrl(callSid);
+async function processWhatsAppJob(job: Job<WhatsAppJobPayload>): Promise<void> {
+  const alreadyProcessed = await persistIncomingMessage(job.data);
+  if (alreadyProcessed) {
+    return;
   }
-  console.log(`[worker] Recording URL: ${recordingUrl}`);
 
-  // Step 2 — transcribe
-  const { transcript, language_code } = await transcribeAudioUrl(recordingUrl);
-  console.log(`[worker] Transcript (${language_code}): ${transcript.slice(0, 120)}...`);
+  const fromPhone = normalizePhone(job.data.fromPhone);
+  const messageText = buildMessageText(job.data);
 
-  // Step 3 — extract lead fields
-  const fields = await extractLeadFields(transcript);
+  console.log(
+    `[whatsapp-worker] Processing message ${job.data.wamid} from ${fromPhone} | attempt=${job.attemptsMade + 1}`
+  );
 
-  // Step 4 — upsert lead + timeline event
+  const fields = await extractFromText(messageText, job.data.senderName);
+
   await upsertLeadAndEvent({
-    phone: from,
+    phone: fromPhone,
     fields,
-    direction,
-    durationSec,
-    transcript,
+    direction: "inbound",
+    durationSec: 0,
+    transcript: messageText,
     intentTag: fields.intent ?? null,
+    channel: "whatsapp",
   });
 
-  // Step 5 — schedule WhatsApp follow-ups
-  await scheduleFollowUps(from, fields);
+  const sendResult = await sendWhatsAppReply(job.data.fromPhone, fields);
+  if (!sendResult.ok) {
+    throw new Error(sendResult.error ?? "Unknown WhatsApp reply error");
+  }
 
-  console.log(`[worker] ✅ Job ${job.id} complete for ${from}`);
+  await markMessageProcessed(job.data.wamid);
+
+  console.log(`[whatsapp-worker] Completed message ${job.data.wamid} for ${fromPhone}`);
 }
 
-// ----------------------------------------------------------------
-// Worker registration
-// ----------------------------------------------------------------
-export function startCallWorker() {
-  const worker = new Worker<CallJobPayload>(
-    CALL_QUEUE_NAME,
-    processCallJob,
+export function startWhatsAppWorker() {
+  const worker = new Worker<WhatsAppJobPayload>(
+    WHATSAPP_QUEUE_NAME,
+    processWhatsAppJob,
     {
-      connection: redisConnection as any,
+      connection: redisConnection,
       concurrency: 5,
     }
   );
 
   worker.on("completed", (job) => {
-    console.log(`[worker] ✅ Completed: ${job.id}`);
+    console.log(`[whatsapp-worker] Completed job ${job.id}`);
   });
 
   worker.on("failed", (job, err) => {
-    console.error(`[worker] ❌ Failed: ${job?.id} | attempt ${job?.attemptsMade} | error: ${err.message}`);
+    console.error(
+      `[whatsapp-worker] Failed job ${job?.id} | attempt ${job?.attemptsMade} | error: ${err.message}`
+    );
   });
 
   worker.on("error", (err) => {
-    console.error("[worker] Worker error:", err);
+    console.error("[whatsapp-worker] Worker error:", err);
   });
 
-  console.log(`[worker] 🚀 Call worker started. Listening on queue: ${CALL_QUEUE_NAME}`);
+  console.log(`[whatsapp-worker] WhatsApp worker started. Listening on queue: ${WHATSAPP_QUEUE_NAME}`);
   return worker;
 }
 
 if (require.main === module) {
-  startCallWorker();
+  startWhatsAppWorker();
 }
