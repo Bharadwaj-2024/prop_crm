@@ -314,12 +314,27 @@ export default function DashboardPage() {
 
       <main className="max-w-screen-xl mx-auto px-6 py-8 space-y-6">
 
+        <section className="relative overflow-hidden rounded-2xl border border-[#C9A84C]/20 bg-gradient-to-r from-[#17140D] via-[#111111] to-[#101418] p-6 shadow-[0_18px_55px_rgba(0,0,0,0.22)]">
+          <div className="absolute -right-10 -top-14 h-40 w-40 rounded-full bg-[#C9A84C]/10 blur-3xl" />
+          <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.8)]" /> Live workspace</div>
+              <h2 className="text-2xl font-extrabold tracking-tight text-[#F5F0E8]">Your pipeline is ready for action.</h2>
+              <p className="mt-2 max-w-xl text-sm text-[#E8E0D0]/60">{serious} serious buyer{serious === 1 ? "" : "s"} and {events.length} customer touchpoint{events.length === 1 ? "" : "s"} are being tracked in one place.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:min-w-[240px]">
+              <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"><p className="text-[10px] font-bold uppercase tracking-widest text-[#6B6B6B]">Hot leads</p><p className="mt-1 text-xl font-extrabold text-emerald-400">{serious}</p></div>
+              <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"><p className="text-[10px] font-bold uppercase tracking-widest text-[#6B6B6B]">Today</p><p className="mt-1 text-xl font-extrabold text-[#C9A84C]">{callsToday + waToday}</p></div>
+            </div>
+          </div>
+        </section>
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((card) => {
             const Icon = card.icon
             return (
-              <Card key={card.label} className="border-[#C9A84C]/10 bg-[#111111] hover:border-[#C9A84C]/25 transition-colors">
+              <Card key={card.label} className="border-[#C9A84C]/10 bg-[#111111] hover:-translate-y-1 hover:border-[#C9A84C]/35 hover:shadow-[0_18px_35px_rgba(0,0,0,0.2)] transition-all duration-300">
                 <CardContent className="p-5">
                   <div className={`w-11 h-11 rounded-xl ${card.bg} ${card.color} flex items-center justify-center mb-4`}>
                     <Icon className="h-5 w-5" />

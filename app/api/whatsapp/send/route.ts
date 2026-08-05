@@ -12,12 +12,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "phone and message are required" }, { status: 400 });
     }
 
-    // Normalize: strip leading + for WhatsApp API
-    const to = phone.startsWith("+") ? phone.slice(1) : phone;
+    const to = normalizeWhatsAppPhone(phone);
+    const result = await sendWhatsAppMessage(to, message);
 
-    await sendWhatsAppMessage(to, message);
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: result.error ?? "WhatsApp send failed",
+          status: result.status,
+          body: result.body,
+        },
+        { status: result.status ?? 502 }
+      );
+    }
 
-    return NextResponse.json({ ok: true }, { status: 200 });
+    return NextResponse.json({ ok: true, to, status: result.status, body: result.body }, { status: 200 });
   } catch (err) {
     console.error("[whatsapp-send] Error:", err);
     return NextResponse.json(
@@ -27,3 +37,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 }
 
+function normalizeWhatsAppPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+
+  if (!digits) {
+    throw new Error("phone must contain digits");
+  }
+
+  if (digits.length === 10) {
+    return `91${digits}`;
+  }
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits;
+  }
+
+  return digits;
+}

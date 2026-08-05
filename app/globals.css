@@ -57,3 +57,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .grid-overlay { pointer-events: none; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 52px 52px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+  .aurora { pointer-events: none; position: absolute; border-radius: 9999px; filter: blur(85px); opacity: .34; animation: aurora-drift 14s ease-in-out infinite alternate; }
+  .aurora-one { width: 34rem; height: 34rem; top: -18rem; right: 3%; background: #9b7227; }
+  .aurora-two { width: 26rem; height: 26rem; top: 22rem; left: -15rem; background: #254e60; animation-delay: -7s; }
+  .text-gradient-gold { background: linear-gradient(115deg, #f8e7a5 5%, #d5ad42 47%, #f4d476 85%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hover-lift { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  .hover-lift:hover { transform: translateY(-5px); border-color: rgba(201,168,76,.35); box-shadow: 0 18px 45px rgba(0,0,0,.22); }
+  .animate-rise { animation: rise .75s cubic-bezier(.2,.8,.2,1) both; }
+  .animate-float-in { animation: float-in .9s .12s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes float-in { from { opacity: 0; transform: translateY(32px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes aurora-drift { from { transform: translate3d(-2%, -3%, 0) scale(1); } to { transform: translate3d(6%, 5%, 0) scale(1.12); } }
+  @media (prefers-reduced-motion: reduce) { .aurora, .animate-rise, .animate-float-in { animation: none; } .hover-lift { transition: none; } }
+}

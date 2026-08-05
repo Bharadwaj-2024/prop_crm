@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 
-const PUBLIC_PATHS = ["/api/auth", "/api/webhooks", "/login", "/_next", "/favicon.ico"];
+const PUBLIC_PATHS = [
+  "/api/auth",
+  "/api/webhooks",
+  "/api/whatsapp",
+  "/api/whatsapp/send",
+  "/login",
+  "/_next",
+  "/favicon.ico",
+];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
