@@ -1,8 +1,8 @@
-// File: C:\Users\bhara\Downloads\call-centric-crm\crm\app\api\auth\logout\route.ts
-import * as entry from '../../../../../../app/api/auth/logout/route.js'
+// File: C:\Users\bhara\Downloads\call-centric-crm\crm\app\api\webhooks\exotel\route.ts
+import * as entry from '../../../../../../app/api/webhooks/exotel/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../../app/api/auth/logout/route.js')
+type TEntry = typeof import('../../../../../../app/api/webhooks/exotel/route.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{
