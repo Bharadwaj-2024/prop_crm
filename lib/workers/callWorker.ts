@@ -11,7 +11,7 @@
  * See: scripts/startWorker.ts  or  `node -r ts-node/register lib/workers/callWorker.ts`
  */
 
-import "dotenv/config"; // loads .env.local when run standalone
+import "dotenv/config"; // loads .env when run standalone (callQueue.ts loads .env.local itself)
 import { Worker, Job } from "bullmq";
 import { CALL_QUEUE_NAME, redisConnection, CallJobPayload } from "@/lib/queues/callQueue";
 import { transcribeAudioUrl } from "@/lib/services/sarvam";

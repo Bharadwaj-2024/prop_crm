@@ -7,16 +7,30 @@
  * WHY: BullMQ needs an IORedis instance, but Upstash only exposes a
  * REST API natively.  We connect via Upstash's redis:// TLS endpoint
  * (the same URL you'd use with ioredis) — NOT the REST URL.
- * Set UPSTASH_REDIS_URL=rediss://:password@host:6379 in .env
+ * Set UPSTASH_REDIS_URL=rediss://:password@host:6379 in .env.local
  */
 
 import { Queue } from "bullmq";
+import * as dotenv from "dotenv";
+
+// Load .env.local explicitly, before we read any env vars below.
+// This file can be imported very early in the module chain (before
+// any other dotenv.config() call has run), so it must not depend on
+// another file having loaded the env first.
+dotenv.config({ path: ".env.local" });
 
 // ---------- Redis connection ----------
 // BullMQ bundles its own ioredis, so we pass plain connection options rather
 // than an IORedis instance to avoid the dual-version type conflict.
 
-const redisUrl = process.env.UPSTASH_REDIS_URL || "rediss://dummy:dummy@dummy.upstash.io:6379";
+const redisUrl = process.env.UPSTASH_REDIS_URL;
+
+if (!redisUrl) {
+  throw new Error(
+    "[callQueue] UPSTASH_REDIS_URL is not set. Check that it exists in .env.local " +
+      "and that this process is loading that file."
+  );
+}
 
 function parseRedisUrl(url: string) {
   const u = new URL(url);
