@@ -27,12 +27,40 @@ export interface UpsertLeadInput {
   channel?: "call" | "whatsapp";
 }
 
+/**
+ * budget_min / budget_max are INTEGER columns in Supabase (lakhs, whole numbers).
+ * The LLM extraction can return fractional or nonsensical values (e.g. 0.05,
+ * mistaking a monthly rent figure for a lakhs budget). Postgres rejects any
+ * non-integer with "invalid input syntax for type integer", which fails the
+ * ENTIRE upsert — losing the whole lead, not just the budget.
+ *
+ * This sanitizer rounds to the nearest whole lakh, and treats anything below
+ * 1 lakh as not a real property budget (almost certainly a bad extraction,
+ * e.g. a monthly rent number) — storing null instead of crashing the insert.
+ */
+function sanitizeBudgetLakhs(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+
+  const rounded = Math.round(value);
+
+  // Anything under 1 lakh isn't a realistic property budget on its own —
+  // almost always a unit-confusion extraction (e.g. monthly rent in rupees
+  // mistaken for a lakhs figure). Store null rather than a misleading value.
+  if (rounded < 1) return null;
+
+  return rounded;
+}
+
 function buildBaseLeadRow(phone: string, fields: ExtractedLeadFields) {
+  const budgetMin = sanitizeBudgetLakhs(fields.budget_min_lakhs);
+  const budgetMax = sanitizeBudgetLakhs(fields.budget_max_lakhs);
+
   return {
     phone,
     ...(fields.name !== null && { name: fields.name }),
-    ...(fields.budget_min_lakhs !== null && { budget_min: fields.budget_min_lakhs }),
-    ...(fields.budget_max_lakhs !== null && { budget_max: fields.budget_max_lakhs }),
+    ...(budgetMin !== null && { budget_min: budgetMin }),
+    ...(budgetMax !== null && { budget_max: budgetMax }),
     ...(fields.location !== null && { location: fields.location }),
     ...(fields.bhk !== null && { bhk: fields.bhk }),
     ...(fields.intent !== null && { intent: fields.intent }),
