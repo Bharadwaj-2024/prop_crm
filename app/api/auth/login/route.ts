@@ -30,6 +30,18 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase();
 
+    // ---- TEMPORARY DEBUG LOGGING — remove once the login issue is fixed ----
+    console.log("[auth/login] DEBUG supabase project:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("[auth/login] DEBUG querying exact email:", JSON.stringify(normalizedEmail));
+    const { data: allBrokers, error: allBrokersError } = await supabase
+      .from("brokers")
+      .select("email, is_active");
+    console.log("[auth/login] DEBUG all brokers this connection can see:", JSON.stringify(allBrokers));
+    if (allBrokersError) {
+      console.log("[auth/login] DEBUG error listing brokers:", allBrokersError.message);
+    }
+    // ---- END TEMPORARY DEBUG LOGGING ----
+
     // Fetch broker
     const { data: broker, error: brokerError } = await supabase
       .from("brokers")
