@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function getSupabase() {
   return createClient(
@@ -22,15 +24,24 @@ export async function GET(req: NextRequest) {
 
     if (leadsError) {
       console.error("[dashboard/data] leads error:", leadsError);
-      return NextResponse.json({ error: leadsError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: leadsError.message },
+        { status: 500 }
+      );
     }
 
     if (eventsError) {
       console.error("[dashboard/data] events error:", eventsError);
-      return NextResponse.json({ error: eventsError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: eventsError.message },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ leads: leads ?? [], events: events ?? [] });
+    return NextResponse.json(
+      { leads: leads ?? [], events: events ?? [] },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (err) {
     console.error("[dashboard/data] fatal:", err);
     return NextResponse.json(
