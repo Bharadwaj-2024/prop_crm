@@ -1,1 +1,3 @@
-{}
+{
+  "/api/webhooks/exotel/route": "app/api/webhooks/exotel/route.js"
+}
