@@ -17,6 +17,11 @@ type MetaErrorPayload = {
   };
 };
 
+export interface WhatsAppTemplateComponent {
+  type: "body";
+  parameters: { type: "text"; text: string }[];
+}
+
 function getPhoneNumberId(): string {
   const id = process.env.WHATSAPP_PHONE_NUMBER_ID;
   if (!id) {
@@ -75,6 +80,80 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
   } catch (error) {
     const messageText = error instanceof Error ? error.message : "Unknown WhatsApp send error";
     console.error("[whatsapp-service] Unexpected send error:", error);
+    return {
+      ok: false,
+      error: messageText,
+    };
+  }
+}
+
+/**
+ * Sends a pre-approved WhatsApp template message. Required for any
+ * business-initiated message sent outside the 24-hour customer service
+ * window — e.g. the Day-0 follow-up, which fires right after a call
+ * ends, before the lead has ever messaged us on WhatsApp.
+ */
+export async function sendWhatsAppTemplateMessage(
+  to: string,
+  templateName: string,
+  languageCode: string,
+  bodyParams: string[]
+): Promise<WhatsAppSendResult> {
+  try {
+    const phoneNumberId = getPhoneNumberId();
+    const accessToken = getAccessToken();
+
+    const components: WhatsAppTemplateComponent[] =
+      bodyParams.length > 0
+        ? [
+            {
+              type: "body",
+              parameters: bodyParams.map((text) => ({ type: "text", text })),
+            },
+          ]
+        : [];
+
+    const res = await fetch(`${WHATSAPP_API_BASE}/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components,
+        },
+      }),
+    });
+
+    const rawText = await res.text();
+    const parsedBody = rawText ? safeJsonParse(rawText) : null;
+
+    if (!res.ok) {
+      const errorMessage = formatWhatsAppError(res.status, parsedBody, rawText);
+      console.error(errorMessage);
+      return {
+        ok: false,
+        status: res.status,
+        body: parsedBody,
+        error: errorMessage,
+      };
+    }
+
+    console.log(`[whatsapp-service] Template message '${templateName}' sent to ${to}`);
+    return {
+      ok: true,
+      status: res.status,
+      body: parsedBody,
+    };
+  } catch (error) {
+    const messageText = error instanceof Error ? error.message : "Unknown WhatsApp template send error";
+    console.error("[whatsapp-service] Unexpected template send error:", error);
     return {
       ok: false,
       error: messageText,

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { ExtractedLeadFields } from "@/lib/services/extractLeadFields";
-import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
+import { sendWhatsAppMessage, sendWhatsAppTemplateMessage } from "@/lib/services/whatsapp";
 
 type FollowUpInsertRow = {
   lead_phone: string;
@@ -55,19 +55,19 @@ function buildFollowUpMessages(fields: ExtractedLeadFields) {
     },
     {
       follow_up_day: 1,
-      message: `Hi ${name}! Following up on your search for ${bhk} in ${location} within ${budget}. I have 3 excellent options ready. When can we schedule a site visit? ??`,
+      message: `Hi ${name}! Following up on your search for ${bhk} in ${location} within ${budget}. I have 3 excellent options ready. When can we schedule a site visit?`,
     },
     {
       follow_up_day: 3,
-      message: `Hi ${name}! Still looking for ${bhk} in ${location}? We have new listings within ${budget}. Reply to see options! ??`,
+      message: `Hi ${name}! Still looking for ${bhk} in ${location}? We have new listings within ${budget}. Reply to see options!`,
     },
     {
       follow_up_day: 7,
-      message: `Hi ${name}! Properties in ${location} are selling fast. Don't miss out ? reply YES to see latest options in ${budget}. ??`,
+      message: `Hi ${name}! Properties in ${location} are selling fast. Don't miss out, reply YES to see latest options in ${budget}.`,
     },
     {
       follow_up_day: 14,
-      message: `Hi ${name}! Final follow up: we have an exclusive ${bhk} in ${location} within ${budget}. Interested? Reply now! ??`,
+      message: `Hi ${name}! Final follow up: we have an exclusive ${bhk} in ${location} within ${budget}. Interested? Reply now!`,
     },
   ];
 }
@@ -110,8 +110,22 @@ export async function scheduleFollowUps(
     );
   }
 
-  console.log(`[schedule-follow-up] Sending Day 0 follow-up to ${leadPhone}`);
-  const result = await sendWhatsAppMessage(leadPhone, dayZero.message);
+  console.log(`[schedule-follow-up] Sending Day 0 follow-up (template) to ${leadPhone}`);
+
+  // Day 0 fires with no prior WhatsApp conversation, so it MUST use an
+  // approved template rather than free-form text. Replace 'call_followup_v1'
+  // with your actual approved template name, and match the parameter
+  // order/count to what you defined in Meta's template body.
+  const result = await sendWhatsAppTemplateMessage(
+    leadPhone,
+    "call_followup_v1",
+    "en",
+    [
+      fields.name ?? "there",
+      fields.bhk ?? "a property",
+      fields.location ?? "your preferred location",
+    ]
+  );
 
   if (!result.ok) {
     const { error: updateError } = await supabase
@@ -147,4 +161,3 @@ export async function scheduleFollowUps(
 
   console.log(`[schedule-follow-up] Day 0 follow-up sent for ${leadPhone}`);
 }
-
